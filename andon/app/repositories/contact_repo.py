@@ -13,6 +13,12 @@ class ContactRepository(BaseRepository[Contact]):
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_email(self, email: str) -> Contact | None:
+        """Look up a contact by email address. Normalises to lowercase."""
+        stmt = select(Contact).where(Contact.email == email.strip().lower())
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_by_trade(self, trade: str) -> list[Contact]:
         stmt = select(Contact).where(Contact.trade == trade)
         result = await self.session.execute(stmt)

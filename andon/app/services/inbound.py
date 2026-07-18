@@ -68,6 +68,8 @@ class InboundProcessor:
         contact = None
         if channel == "sms" and sender_id:
             contact = await contact_repo.get_by_phone(sender_id)
+        elif channel == "email" and sender_id:
+            contact = await contact_repo.get_by_email(sender_id)
 
         if contact:
             result["contact_name"] = contact.name
