@@ -68,12 +68,70 @@
         📅 Date
       </button>
       {% if item.sub_phone %}
-      <a href="tel:{{ item.sub_phone }}"
-         class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition
-                bg-purple-50 text-purple-700 hover:bg-purple-100"
-         title="Call {{ item.sub_name or 'sub' }} at {{ item.sub_phone }}">
-        📞 Call{% if item.sub_name %} {{ item.sub_name.split()[0] }}{% endif %}
-      </a>
+      <div class="relative inline-block contact-dropdown">
+        <button onclick="toggleDropdown(event, 'dd-{{ item.id }}')"
+                class="px-3 py-1.5 text-xs font-medium rounded-lg transition
+                       bg-purple-50 text-purple-700 hover:bg-purple-100">
+          📞 Call ▾
+        </button>
+        <div id="dd-{{ item.id }}"
+             class="absolute bottom-full left-0 mb-1 z-30 hidden w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-1">
+
+          <!-- Call Contact -->
+          <a href="tel:{{ item.sub_phone }}"
+             class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50 transition">
+            <span class="text-base">📞</span>
+            <div>
+              <p class="font-medium">Call {{ item.sub_name.split()[0] if item.sub_name else 'Sub' }}</p>
+              <p class="text-xs text-gray-400">{{ item.sub_phone }}</p>
+            </div>
+          </a>
+
+          <div class="border-t border-gray-100 my-1"></div>
+
+          <!-- Call Boss -->
+          {% if item.boss_phone %}
+          <a href="tel:{{ item.boss_phone }}"
+             class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50 transition">
+            <span class="text-base">👔</span>
+            <div>
+              <p class="font-medium">Call Boss</p>
+              <p class="text-xs text-gray-400">{{ item.boss_phone }}</p>
+            </div>
+          </a>
+          {% else %}
+          <div class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-400 cursor-not-allowed">
+            <span class="text-base">👔</span>
+            <div>
+              <p class="font-medium">Call Boss</p>
+              <p class="text-xs text-gray-400">No manager phone on file</p>
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="border-t border-gray-100 my-1"></div>
+
+          <!-- Email Contact -->
+          {% if item.sub_email %}
+          <a href="mailto:{{ item.sub_email }}?subject=TLG%20Homes%20-%20{{ item.address | replace(' ', '%20') }}"
+             class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50 transition">
+            <span class="text-base">✉️</span>
+            <div>
+              <p class="font-medium">Email {{ item.sub_name.split()[0] if item.sub_name else 'Sub' }}</p>
+              <p class="text-xs text-gray-400">{{ item.sub_email }}</p>
+            </div>
+          </a>
+          {% else %}
+          <div class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-400 cursor-not-allowed">
+            <span class="text-base">✉️</span>
+            <div>
+              <p class="font-medium">Email Sub</p>
+              <p class="text-xs text-gray-400">No email on file</p>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
       {% endif %}
       <button hx-post="/dashboard/{{ item.id }}/escalate"
               hx-target="#house-list" hx-swap="outerHTML"

@@ -117,7 +117,7 @@ async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
         latest_event = event_result.scalar_one_or_none()
 
         # Get the subcontractor contact info for this trade
-        _sub_name, _sub_phone = await _get_sub_contact(session, item.trade)
+        _sub_name, _sub_phone, _sub_email, _boss_phone = await _get_sub_contact(session, item.trade)
 
         rows.append({
             "id": str(item.id),
@@ -133,15 +133,17 @@ async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
             "scheduled_start": item.scheduled_start,
             "sub_name": _sub_name,
             "sub_phone": _sub_phone,
+            "sub_email": _sub_email,
+            "boss_phone": _boss_phone,
         })
 
     return rows
 
 
-async def _get_sub_contact(session: AsyncSession, trade: str) -> tuple[str | None, str | None]:
-    """Look up the subcontractor name and phone for a given trade."""
+async def _get_sub_contact(session: AsyncSession, trade: str) -> tuple:
+    """Look up the subcontractor name, phone, email, and manager phone for a given trade."""
     if not trade:
-        return None, None
+        return None, None, None, None
     stmt = select(Contact).where(
         Contact.trade == trade,
         Contact.is_active == True,  # noqa: E712
@@ -149,8 +151,8 @@ async def _get_sub_contact(session: AsyncSession, trade: str) -> tuple[str | Non
     result = await session.execute(stmt)
     contact = result.scalar_one_or_none()
     if contact:
-        return contact.name, contact.phone
-    return None, None
+        return contact.name, contact.phone, contact.email, contact.manager_phone
+    return None, None, None, None
 
 
 async def _log_action(

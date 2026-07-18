@@ -33,32 +33,32 @@ TRADE_PHASES = [
 
 SEED_CONTACTS = [
     # Foundation / Concrete
-    {"trade": "foundation_concrete", "name": "Jim's Concrete", "company": "Jim's Concrete Services", "phone": None, "email": None, "notes": "Used for all foundation work"},
+    {"trade": "foundation_concrete", "name": "Jim's Concrete", "company": "Jim's Concrete Services", "phone": "+19205551111", "email": "jim@jimsconcrete.com", "manager_phone": "+19205551212", "notes": "Used for all foundation work"},
     # Framing
-    {"trade": "framing", "name": "Northwoods Framers", "company": "Northwoods Framing Co.", "phone": None, "email": None, "notes": "Specialized framing crew — all they do is frame"},
+    {"trade": "framing", "name": "Northwoods Framers", "company": "Northwoods Framing Co.", "phone": "+19205552222", "email": "dispatch@northwoodsframing.com", "manager_phone": "+19205552323", "notes": "Specialized framing crew — all they do is frame"},
     # Plumbing
-    {"trade": "plumbing_rough", "name": "TLG Plumbing", "company": "TLG Homes Plumbing Division", "phone": None, "email": None, "notes": "Owned by TLG owner — newer company"},
+    {"trade": "plumbing_rough", "name": "TLG Plumbing", "company": "TLG Homes Plumbing Division", "phone": "+19205553333", "email": "plumbing@tlghomes.com", "manager_phone": None, "notes": "Owned by TLG owner — newer company"},
     # HVAC
-    {"trade": "hvac_rough", "name": "Mike's HVAC", "company": "Mike's Heating & Cooling", "phone": None, "email": None, "notes": "Been painting vent hoods himself — switching to plastic"},
+    {"trade": "hvac_rough", "name": "Mike's HVAC", "company": "Mike's Heating & Cooling", "phone": "+19205554444", "email": "mike@mikeshvac.com", "manager_phone": "+19205554545", "notes": "Been painting vent hoods himself — switching to plastic"},
     # Electrical
-    {"trade": "electrical_rough", "name": "Lakeshore Electric", "company": "Lakeshore Electric LLC", "phone": None, "email": None, "notes": "Electrician is also a county inspector — never fails inspection"},
+    {"trade": "electrical_rough", "name": "Lakeshore Electric", "company": "Lakeshore Electric LLC", "phone": "+19205555555", "email": "dispatch@lakeshoreelectric.com", "manager_phone": "+19205555656", "notes": "Electrician is also a county inspector — never fails inspection"},
     # Drywall
-    {"trade": "drywall_plaster", "name": "Clint (PM Assistant)", "company": "TLG Homes", "phone": None, "email": None, "notes": "Jimmy + Clint handle small drywall touch-ups themselves"},
+    {"trade": "drywall_plaster", "name": "Clint (PM Assistant)", "company": "TLG Homes", "phone": "+19205556666", "email": "clint@tlghomes.com", "manager_phone": None, "notes": "Jimmy + Clint handle small drywall touch-ups themselves"},
     # Paint
-    {"trade": "paint", "name": "Paul the Painter", "company": "Paul's Painting", "phone": None, "email": None, "notes": "Brushes trim, doesn't search for own touch-ups"},
+    {"trade": "paint", "name": "Paul the Painter", "company": "Paul's Painting", "phone": "+19205557777", "email": "paul@paulspainting.com", "manager_phone": "+19205557878", "notes": "Brushes trim, doesn't search for own touch-ups"},
     # Flooring
-    {"trade": "flooring", "name": "Macos Flooring", "company": "Macos Flooring & Design", "phone": None, "email": None, "notes": "Reputable — lifetime warranty, professional installers"},
+    {"trade": "flooring", "name": "Macos Flooring", "company": "Macos Flooring & Design", "phone": "+19205558888", "email": "orders@macosflooring.com", "manager_phone": "+19205558989", "notes": "Reputable — lifetime warranty, professional installers"},
     # Cabinets
-    {"trade": "cabinets", "name": "Brown Building Center", "company": "Brown Building Supply", "phone": None, "email": None, "notes": "Supplies trim, windows, lumber packages"},
+    {"trade": "cabinets", "name": "Brown Building Center", "company": "Brown Building Supply", "phone": "+19205559999", "email": "builders@brownbuilding.com", "manager_phone": "+19205550000", "notes": "Supplies trim, windows, lumber packages"},
     # Finish Work
-    {"trade": "finish_work", "name": "Various Finish Crews", "company": "TLG Homes", "phone": None, "email": None, "notes": "Final fixtures, touch-ups, and punch list"},
+    {"trade": "finish_work", "name": "Various Finish Crews", "company": "TLG Homes", "phone": "+19205550001", "email": "finish@tlghomes.com", "manager_phone": None, "notes": "Final fixtures, touch-ups, and punch list"},
 ]
 
 # Internal team contacts (not tied to a single trade)
 SEED_TEAM = [
-    {"trade": None, "name": "Jimmy (Project Manager)", "company": "TLG Homes", "phone": None, "email": None, "notes": "Project Manager — primary user of Andon system"},
-    {"trade": None, "name": "Clint (Foreman)", "company": "TLG Homes", "phone": None, "email": None, "notes": "Foreman/Assistant — secondary dashboard user"},
-    {"trade": None, "name": "Brian (Owner)", "company": "TLG Homes", "phone": None, "email": None, "notes": "Owner — escalations land here"},
+    {"trade": None, "name": "Jimmy (Project Manager)", "company": "TLG Homes", "phone": "+19205550010", "email": "jimmy@tlghomes.com", "manager_phone": None, "notes": "Project Manager — primary user of Andon system"},
+    {"trade": None, "name": "Clint (Foreman)", "company": "TLG Homes", "phone": "+19205550011", "email": "clint@tlghomes.com", "manager_phone": None, "notes": "Foreman/Assistant — secondary dashboard user"},
+    {"trade": None, "name": "Brian (Owner)", "company": "TLG Homes", "phone": "+19205550012", "email": "brian@tlghomes.com", "manager_phone": None, "notes": "Owner — escalations land here"},
 ]
 
 SEED_HOUSES = [

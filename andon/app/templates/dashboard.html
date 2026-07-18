@@ -83,6 +83,29 @@ function openDatePicker(itemId) {
 function closeDatePicker() {
   document.getElementById('date-modal').classList.add('hidden');
 }
+
+// Dropdown toggle for Call button
+function toggleDropdown(event, id) {
+  event.stopPropagation();
+  var dd = document.getElementById(id);
+  if (!dd) return;
+  var isOpen = !dd.classList.contains('hidden');
+  // Close all other dropdowns
+  document.querySelectorAll('.contact-dropdown > div:not(.hidden)').forEach(function(d) {
+    d.classList.add('hidden');
+  });
+  if (!isOpen) {
+    dd.classList.remove('hidden');
+  }
+}
+
+// Close dropdowns on outside click
+document.addEventListener('click', function() {
+  document.querySelectorAll('.contact-dropdown > div:not(.hidden)').forEach(function(d) {
+    d.classList.add('hidden');
+  });
+});
+
 // Auto-refresh every 60s
 setInterval(function() {
   htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'outerHTML'});
