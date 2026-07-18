@@ -438,12 +438,28 @@ async def dashboard_partial(request: Request, session: AsyncSession = Depends(ge
 async def resolve_item(
     request: Request,
     item_id: UUID,
+    correct_status: str = "G",
+    comment: str = "",
     session: AsyncSession = Depends(get_db),
 ):
-    """Resolve: set andon_status to Green, log event, return updated row list."""
+    """Resolve: set andon_status to Green, log event, return updated row list.
+    If correct_status is provided (R/Y/G), log a classification correction."""
     repo = ScheduleRepository(session)
-    await repo.update(item_id, andon_status="G")
-    await _log_action(session, item_id, "Resolved", "Status set to Green")
+
+    if correct_status != "G" and correct_status in ("R", "Y", "G"):
+        # This is a classification correction — log original vs new
+        item = await repo.get(item_id)
+        orig_status = item.andon_status if item else "?"
+        await repo.update(item_id, andon_status=correct_status)
+        detail = f"Classification corrected: {orig_status} → {correct_status}"
+        if comment:
+            detail += f" | {comment}"
+        await _log_action(session, item_id, detail, "Feedback correction")
+    else:
+        # Normal resolve to Green
+        await repo.update(item_id, andon_status="G")
+        await _log_action(session, item_id, "Resolved", "Status set to Green")
+
     await session.commit()
 
     html = await _render_rows(session)
@@ -530,6 +546,7 @@ async def correct_classification(
     request: Request,
     event_id: UUID,
     correct_status: str = Query(...),
+    comment: str = Query(""),
     session: AsyncSession = Depends(get_db),
 ):
     """
@@ -541,6 +558,7 @@ async def correct_classification(
 
     Query params:
       correct_status: 'R', 'Y', or 'G' — what the status SHOULD have been
+      comment: Optional short note explaining why it was corrected
     """
     if correct_status not in ("R", "Y", "G"):
         return HTMLResponse("Invalid status", status_code=400)
@@ -551,13 +569,20 @@ async def correct_classification(
     if not original:
         return HTMLResponse("Event not found", status_code=404)
 
+    # Build the correction text with optional comment
+    correction_text = (
+        f"[CLASSIFICATION CORRECTION] Event {event_id}: "
+        f"original={original.outcome or 'none'} "
+        f"corrected={correct_status}"
+    )
+    if comment:
+        correction_text += f" | comment: {comment}"
+
     # Log the correction as a new Event
     await event_repo.create(
         direction="outbound",
         channel="sms",
-        full_text=f"[CLASSIFICATION CORRECTION] Event {event_id}: "
-                  f"original={original.outcome or 'none'} "
-                  f"corrected={correct_status}",
+        full_text=correction_text,
         house_id=original.house_id,
         schedule_item_id=original.schedule_item_id,
         trade=original.trade,
@@ -571,8 +596,8 @@ async def correct_classification(
         await schedule_repo.update(original.schedule_item_id, andon_status=correct_status)
 
     await session.commit()
-    logger.info("Classification corrected: event=%s original=%s -> %s",
-                event_id, original.outcome, correct_status)
+    logger.info("Classification corrected: event=%s original=%s -> %s (comment: %s)",
+                event_id, original.outcome, correct_status, comment or "-")
 
     # Return updated dashboard rows
     html = await _render_rows(session)

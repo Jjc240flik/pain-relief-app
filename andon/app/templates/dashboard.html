@@ -286,35 +286,52 @@ function closeVideo() {
 }
 
 // ── Classification feedback ──
-function classifyFeedback(itemId, feedback) {
-  // Find the latest event for this schedule item
-  // For MVP, we log a simple confirmation to the server
-  fetch('/dashboard/' + itemId + '/escalate', { method: 'POST' })
-    .then(function(r) { return r.text(); })
-    .then(function(html) {
-      htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'outerHTML'});
-    });
-  // Show a quick visual confirmation
-  var btn = document.querySelector('[onclick*="classifyFeedback(\'' + itemId + '\', \'correct\')"]');
-  if (btn) btn.textContent = '✓';
+function confirmClassification(itemId) {
+  // 👍 clicked — user confirmed the classification is correct
+  // Hide the feedback widget — no status change needed
+  document.getElementById('fb-default-' + itemId).classList.add('hidden');
+  document.getElementById('fb-done-' + itemId).classList.remove('hidden');
+  document.getElementById('fb-done-' + itemId).querySelector('span').textContent = '✓ Confirmed';
 }
 
-function showCorrectionPicker(itemId, lastMessage) {
-  var currentStatus = prompt('Enter the CORRECT status for this issue:\nR = Red (blocked, urgent)\nY = Yellow (at risk, monitoring)\nG = Green (resolved, on track)\n\nLeave blank to cancel.');
-  if (!currentStatus) return;
-  currentStatus = currentStatus.toUpperCase().trim();
-  if (!['R','Y','G'].includes(currentStatus)) {
-    alert('Please enter R, Y, or G.');
-    return;
-  }
-  // Send correction to the feedback endpoint
-  // We use the last event for this schedule item (via the dashboard route)
+function showCorrection(itemId) {
+  // 👎 clicked — show the correction picker
+  document.getElementById('fb-default-' + itemId).classList.add('hidden');
+  document.getElementById('fb-picker-' + itemId).classList.remove('hidden');
+  // Focus the comment field
+  var comment = document.getElementById('fb-comment-' + itemId);
+  if (comment) setTimeout(function() { comment.focus(); }, 100);
+}
+
+function applyCorrection(itemId, newStatus) {
+  // Send correction to the resolve endpoint with correct_status
   var form = new FormData();
-  form.append('correct_status', currentStatus);
+  form.append('correct_status', newStatus);
+  
+  var comment = document.getElementById('fb-comment-' + itemId).value.trim();
+  if (comment) form.append('comment', comment);
+  
+  // Show confirmation immediately
+  document.getElementById('fb-picker-' + itemId).classList.add('hidden');
+  var done = document.getElementById('fb-done-' + itemId);
+  done.classList.remove('hidden');
+  done.querySelector('span').textContent =
+    '✓ Changed to ' + (newStatus === 'R' ? 'Red' : newStatus === 'Y' ? 'Yellow' : 'Green');
+  
+  // Send correction and refresh
   fetch('/dashboard/' + itemId + '/resolve', { method: 'POST', body: form })
     .then(function() {
       htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'outerHTML'});
     });
+}
+
+function cancelCorrection(itemId) {
+  document.getElementById('fb-picker-' + itemId).classList.add('hidden');
+  document.getElementById('fb-default-' + itemId).classList.remove('hidden');
+  // Clear the comment
+  document.getElementById('fb-comment-' + itemId).value = '';
+  document.getElementById('fb-comment-' + itemId).style.borderColor = '#d1d5db';
+  document.getElementById('fb-comment-' + itemId).placeholder = 'Optional reason...';
 }
 </script>
 
