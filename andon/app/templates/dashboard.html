@@ -143,41 +143,84 @@ var galleryItems = [];
 var galleryIndex = 0;
 
 function openGallery(itemId) {
-  // For MVP: media data is embedded in the button's data attributes
-  // For now, show a placeholder — real integration requires passing media URLs
-  // to the template context, which is done via item.media_info
   var row = document.getElementById('row-' + itemId);
   if (!row) return;
-  // Find the media info from the data attribute
-  var btn = row.querySelector('[onclick*=\"openGallery\"]');
+  var btn = row.querySelector('.photo-gallery-btn');
   if (!btn) return;
   
-  // Simple gallery for MVP — fetch media from the event's raw_payload
-  // TODO: Phase 2 — pass full media URLs via data attributes
+  try {
+    galleryItems = JSON.parse(btn.getAttribute('data-media') || '[]');
+    // Filter to only photos
+    galleryItems = galleryItems.filter(function(m) { return m.category === 'photo' && m.url; });
+  } catch(e) {
+    galleryItems = [];
+  }
+  
+  if (galleryItems.length === 0) return;
+  
+  galleryIndex = 0;
+  showGalleryImage();
+  document.getElementById('gallery-modal').classList.remove('hidden');
+}
+
+function showGalleryImage() {
   var img = document.getElementById('gallery-img');
   var counter = document.getElementById('gallery-counter');
   var nav = document.getElementById('gallery-nav');
   
-  // For now, use the Twilio media URL from the raw_payload
-  // This is a simplified MVP version
-  img.src = ''; // Will be populated from backend data
-  img.classList.add('hidden');
-  nav.classList.add('hidden');
-  counter.textContent = 'Photos coming soon — full gallery in next update';
+  var item = galleryItems[galleryIndex];
+  img.src = item.url;
+  img.classList.remove('hidden');
   
-  document.getElementById('gallery-modal').classList.remove('hidden');
+  if (galleryItems.length > 1) {
+    counter.textContent = (galleryIndex + 1) + ' of ' + galleryItems.length;
+    nav.classList.remove('hidden');
+  } else {
+    counter.textContent = '';
+    nav.classList.add('hidden');
+  }
+}
+
+function galleryNext() {
+  if (galleryIndex < galleryItems.length - 1) {
+    galleryIndex++;
+    showGalleryImage();
+  }
+}
+
+function galleryPrev() {
+  if (galleryIndex > 0) {
+    galleryIndex--;
+    showGalleryImage();
+  }
 }
 
 function closeGallery() {
   document.getElementById('gallery-modal').classList.add('hidden');
+  document.getElementById('gallery-img').classList.add('hidden');
+  galleryItems = [];
 }
 
 function openVideo(itemId) {
+  var row = document.getElementById('row-' + itemId);
+  if (!row) return;
+  var btn = row.querySelector('.video-btn');
+  if (!btn) return;
+  
+  try {
+    var mediaList = JSON.parse(btn.getAttribute('data-media') || '[]');
+    var videoItem = mediaList.find(function(m) { return m.category === 'video' && m.url; });
+  } catch(e) {
+    return;
+  }
+  
+  if (!videoItem) return;
+  
   var player = document.getElementById('video-player');
-  // MVP: video playback requires the media URL from the event
-  // For now show a placeholder message
-  player.innerHTML = '<p class=\"text-white text-center py-8\">Video playback coming soon</p>';
+  player.src = videoItem.url;
+  player.load();
   document.getElementById('video-modal').classList.remove('hidden');
+  player.play();
 }
 
 function closeVideo() {

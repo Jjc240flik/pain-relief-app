@@ -198,6 +198,24 @@ async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
         event_result = await session.execute(event_stmt)
         latest_event = event_result.scalar_one_or_none()
 
+        # Collect media from ALL recent inbound events for this item
+        # (not just the latest — media may be in an older MMS event)
+        all_events_stmt = (
+            select(Event)
+            .where(
+                Event.schedule_item_id == item.id,
+                Event.direction == "inbound",
+                Event.raw_payload.isnot(None),
+            )
+            .order_by(desc(Event.timestamp))
+            .limit(20)
+        )
+        all_result = await session.execute(all_events_stmt)
+        all_events = all_result.scalars().all()
+        all_media = []
+        for evt in all_events:
+            all_media.extend(_parse_media_info(evt))
+
         # Get the subcontractor contact info for this trade
         _sub_name, _sub_phone, _sub_email, _boss_phone = await _get_sub_contact(session, item.trade)
 
@@ -222,10 +240,11 @@ async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
             "sub_phone": _sub_phone,
             "sub_email": _sub_email,
             "boss_phone": _boss_phone,
-            # ── Media attachments from latest event (MMS photos/video) ──
-            "media_info": _parse_media_info(latest_event),
-            "photo_count": _count_media_by_type(latest_event, "photo"),
-            "has_video": _count_media_by_type(latest_event, "video") > 0,
+            # ── Media attachments from ALL recent events (MMS photos/video) ──
+            "media_info": all_media,
+            "photo_count": sum(1 for m in all_media if m.get("category") == "photo"),
+            "has_video": any(m.get("category") == "video" for m in all_media),
+            "media_list": all_media,
         })
 
     return rows

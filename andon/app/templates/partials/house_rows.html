@@ -43,13 +43,15 @@
     <div class="flex items-center gap-2 mb-2">
       {% if item.photo_count > 0 %}
       <button onclick="openGallery('{{ item.id }}')"
-              class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 transition">
+              data-media='{{ item.media_list | tojson }}'
+              class="photo-gallery-btn inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 transition">
         📷 {{ item.photo_count }} photo{% if item.photo_count > 1 %}s{% endif %}
       </button>
       {% endif %}
       {% if item.has_video %}
       <button onclick="openVideo('{{ item.id }}')"
-              class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-purple-50 text-purple-600 hover:bg-purple-100 transition">
+              data-media='{{ item.media_list | tojson }}'
+              class="video-btn inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-purple-50 text-purple-600 hover:bg-purple-100 transition">
         ▶️ Video
       </button>
       {% endif %}
