@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Success! — TLG Andon{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50 px-4 py-8">
+  <div class="max-w-lg w-full">
+
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 sm:p-10 text-center">
+
+      <!-- Progress -->
+      <div class="flex items-center justify-center gap-2 mb-6 text-sm">
+        <span class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">✓</span>
+        <span class="text-gray-400">—</span>
+        <span class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">✓</span>
+        <span class="text-gray-400">—</span>
+        <span class="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center font-bold">✓</span>
+      </div>
+
+      <!-- Success icon -->
+      <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <span class="text-3xl">✅</span>
+      </div>
+
+      <h1 class="text-2xl font-bold text-gray-900">You're All Set!</h1>
+
+      <div class="my-6 bg-green-50 rounded-xl border border-green-200 p-6">
+        <p class="text-3xl font-bold text-green-700">{{ imported }}</p>
+        <p class="text-sm text-green-600">contacts imported successfully</p>
+        {% if updated > 0 %}
+        <p class="text-xs text-green-500 mt-1">{{ updated }} existing contacts updated</p>
+        {% endif %}
+        {% if skipped > 0 %}
+        <p class="text-xs text-amber-500 mt-1">{{ skipped }} rows skipped (missing phone and email)</p>
+        {% endif %}
+      </div>
+
+      <div class="space-y-3">
+        <a href="/dashboard"
+           class="block w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition shadow-sm">
+          Go to Your Dashboard →
+        </a>
+        <a href="/admin/contacts"
+           class="block w-full px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition">
+          Review & Edit Contacts
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

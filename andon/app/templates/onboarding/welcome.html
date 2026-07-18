@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Welcome — TLG Andon{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 px-4">
+  <div class="max-w-2xl w-full">
+
+    <!-- Card -->
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 sm:p-12 text-center">
+
+      <!-- App branding -->
+      <div class="mb-6">
+        <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+          <span class="text-white text-3xl font-bold">TLG</span>
+        </div>
+        <h1 class="text-3xl font-bold text-gray-900">Welcome to TLG Andon</h1>
+        <p class="text-gray-500 mt-2 max-w-md mx-auto">
+          Your SMS-powered issue tracking system. Let's get you set up in just a few minutes.
+        </p>
+      </div>
+
+      <!-- Steps -->
+      <div class="grid gap-4 text-left mb-8">
+        <div class="flex items-start gap-4 p-4 bg-blue-50 rounded-xl border border-blue-100">
+          <div class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold shrink-0">1</div>
+          <div>
+            <h3 class="font-semibold text-gray-900">Import Your Contacts</h3>
+            <p class="text-sm text-gray-500">Upload a CSV or Excel file with your subcontractors. We'll provide a template.</p>
+          </div>
+        </div>
+        <div class="flex items-start gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+          <div class="w-8 h-8 bg-gray-300 text-white rounded-full flex items-center justify-center text-sm font-bold shrink-0">2</div>
+          <div>
+            <h3 class="font-semibold text-gray-900">Start Monitoring</h3>
+            <p class="text-sm text-gray-500">Your dashboard is ready to receive issues via SMS, email, and voice.</p>
+          </div>
+        </div>
+        <div class="flex items-start gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+          <div class="w-8 h-8 bg-gray-300 text-white rounded-full flex items-center justify-center text-sm font-bold shrink-0">3</div>
+          <div>
+            <h3 class="font-semibold text-gray-900">Manage & Improve</h3>
+            <p class="text-sm text-gray-500">Use the admin tools to track performance and refine classifications over time.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="/onboarding/import"
+           class="px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition shadow-sm">
+          Import Contacts →
+        </a>
+        <a href="/onboarding/add"
+           class="px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition">
+          Add Manually
+        </a>
+        <a href="/onboarding/skip"
+           class="px-6 py-3 text-gray-400 font-medium rounded-xl hover:text-gray-600 transition">
+          Skip for Now
+        </a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <p class="text-center text-xs text-gray-400 mt-6">
+      You can always import contacts later from the Contacts section.
+    </p>
+  </div>
+</div>
+{% endblock %}
