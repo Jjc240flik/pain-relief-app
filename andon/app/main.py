@@ -16,6 +16,7 @@ from app.webhooks.twilio import router as twilio_router
 from app.api import router as api_router
 from app.api.seed import router as seed_router
 from app.api.schedule import router as schedule_router
+from app.views.dashboard import router as dashboard_router
 from app.services.scheduler import SchedulerService
 
 # ---------------------------------------------------------------------------
@@ -72,4 +73,5 @@ app.add_middleware(
 app.include_router(api_router)       # /api/health
 app.include_router(seed_router)      # /api/seed
 app.include_router(schedule_router)  # /api/schedule
+app.include_router(dashboard_router) # /dashboard + HTMX actions
 app.include_router(twilio_router)    # /webhooks/twilio/*
