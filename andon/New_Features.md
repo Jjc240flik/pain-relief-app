@@ -68,3 +68,52 @@ This turns a manual "copy-paste-remember-who-to-tell" workflow into a single tap
 ### Rationale
 
 During the interview, Jim described that when multiple issues fire at once, he coordinates with Brian and Clint to *"divide and conquer"*. A pre-built escalation message ensures the right people get the right information immediately, without Jim having to compose it under pressure.
+
+---
+
+## 4. Delegate Button (Internal Task Assignment)
+
+- **Value:** High
+- **Effort:** Medium
+- **Recommendation:** Add after the core system (SMS loop + Dashboard + Classifier) is stable and Jim is actively using it daily.
+
+### Description
+
+Jim (or any paid internal user) can click a **"Delegate"** button on any Red or Yellow issue. This opens a simple interface showing other paid staff members in the company:
+
+- Office Admin
+- Boss / Brian (Owner)
+- Crew Foremen (Clint, etc.)
+- Interior Designer
+- Other relevant internal roles
+
+Jim can assign the issue to one or more colleagues and add a short note — for example:
+
+> *"Please call this sub and confirm material arrival"*
+> *"Can you swing by 4925 Big Sky Pass this afternoon?"*
+
+The assigned person receives a notification (initially via email or in-app, later possibly SMS) with:
+
+- The house address
+- The issue summary
+- Jim's note
+- A link to view the issue in the dashboard
+
+The original issue card should display:
+
+- Who it was delegated to (name or role)
+- The status of the delegation (Pending / In Progress / Resolved)
+- A brief preview of Jim's note
+
+This feature is only available to paid internal users — not to external subcontractors.
+
+### Future Considerations
+
+- Track delegation history in the `events` table for full audit trail
+- Allow the assigned person to mark the task as **"In Progress"** or **"Resolved"** with a follow-up note
+- Support recurring delegations or templates for common issue types (e.g. *"Follow up on material delivery"*)
+- Add SMS notification for urgent delegations as a later upgrade
+
+### Rationale
+
+Jim currently handles nearly every issue personally. During the interview, he described needing to *"divide and conquer"* when multiple things go wrong at once. A Delegate button lets him distribute work across the team without leaving the dashboard — reducing his personal bottleneck and keeping issues moving even when he's stretched thin.
