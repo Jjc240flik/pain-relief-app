@@ -47,6 +47,29 @@
 
 <!-- ── MAIN CONTENT ── -->
 <main class="max-w-3xl mx-auto px-4 py-6">
+
+  <!-- ── ESCALATION BANNERS ── -->
+  {% if escalations %}
+  <div class="space-y-2 mb-4">
+    {% for esc in escalations %}
+    <div class="flex items-start gap-3 px-4 py-3 rounded-lg border bg-red-50 border-red-200">
+      <span class="text-lg shrink-0">🚨</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-red-800">{{ esc.reason }}</p>
+        <p class="text-xs text-red-600 mt-0.5">{{ esc.message }}</p>
+        <div class="flex items-center gap-2 mt-2">
+          <span class="text-[10px] text-red-500 font-medium">{{ esc.group }} → {{ esc.members }}</span>
+          <button onclick="sendEscalation('{{ esc.item_id }}', '{{ esc.message | e }}')"
+                  class="px-2 py-0.5 text-[10px] font-medium bg-red-600 text-white rounded hover:bg-red-700 transition">
+            Send Escalation
+          </button>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <div id="house-list" class="space-y-3">
     {% include "partials/house_rows.html" %}
   </div>
@@ -407,6 +430,21 @@ function submitDelegate() {
 function prefillDelegationNote(itemId, note) {
   openDelegateModal(itemId);
   document.getElementById('delegate-note').value = note;
+}
+
+// ── Escalation ──
+function sendEscalation(itemId, message) {
+  if (!confirm('Send this escalation message?')) return;
+  var form = new FormData();
+  form.append('message', message);
+  fetch('/dashboard/' + itemId + '/send-escalation', { method: 'POST', body: form })
+    .then(function() {
+      htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'outerHTML'});
+      // Remove the escalation banner
+      var btn = event.target;
+      var banner = btn.closest('[class*="bg-red-50"]');
+      if (banner) banner.style.display = 'none';
+    });
 }
 </script>
 
