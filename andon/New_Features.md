@@ -75,43 +75,47 @@ During the interview, Jim described that when multiple issues fire at once, he c
 
 - **Value:** High
 - **Effort:** Medium
-- **Recommendation:** Add after the core system (SMS loop + Dashboard + Classifier) is stable and Jim is actively using it daily.
+- **Recommendation:** Add after the core system (SMS loop, Dashboard, Classifier, media handling) is stable and Jim is actively using the app daily.
 
 ### Description
 
-Jim (or any paid internal user) can click a **"Delegate"** button on any Red or Yellow issue. This opens a simple interface showing other paid staff members in the company:
+Jim can click a **"Delegate"** button on any Red or Yellow issue card. This opens a simple interface showing other paid internal team members:
 
 - Office Admin
-- Boss / Brian (Owner)
+- Brian (Owner)
 - Crew Foremen (Clint, etc.)
 - Interior Designer
 - Other relevant internal roles
 
-Jim can assign the issue to one or more colleagues and add a short note — for example:
-
-> *"Please call this sub and confirm material arrival"*
-> *"Can you swing by 4925 Big Sky Pass this afternoon?"*
-
-The assigned person receives a notification (initially via email or in-app, later possibly SMS) with:
+Jim can assign the issue to one or more colleagues and add a short note with instructions. The assigned person receives a notification (email or in-app) with:
 
 - The house address
-- The issue summary
+- The issue details
 - Jim's note
-- A link to view the issue in the dashboard
 
-The original issue card should display:
+The original issue card on Jim's dashboard updates to show:
 
-- Who it was delegated to (name or role)
-- The status of the delegation (Pending / In Progress / Resolved)
-- A brief preview of Jim's note
+- **Who** the issue was delegated to
+- **Jim's note** (preview)
+- **Current delegation status** (e.g. *"Delegated to Clint"*)
+
+The assigned person can update the status of the task (e.g. mark as **"In Progress"** or **"Resolved"**) and add comments. These updates should be visible back on the main dashboard.
+
+Jim should **still see the issue** on his dashboard — it does not disappear after delegating. He should also be able to **reclaim or re-assign** the task if needed.
+
+All delegation activity and updates are logged in the `events` table for audit and history purposes.
 
 This feature is only available to paid internal users — not to external subcontractors.
 
+### Goal
+
+Allow Jim to efficiently distribute work across his team instead of personally handling every issue, while maintaining full visibility and accountability from his dashboard.
+
 ### Future Considerations
 
-- Track delegation history in the `events` table for full audit trail
-- Allow the assigned person to mark the task as **"In Progress"** or **"Resolved"** with a follow-up note
-- Support recurring delegations or templates for common issue types (e.g. *"Follow up on material delivery"*)
+- Support templates for common delegation notes
+- Allow recurring delegations or scheduled follow-ups
+- Add permission levels (e.g. who can delegate vs who can only receive tasks)
 - Add SMS notification for urgent delegations as a later upgrade
 
 ### Rationale
