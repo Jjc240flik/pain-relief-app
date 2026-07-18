@@ -192,3 +192,128 @@ async def admin_analytics(
         top_subs=top_subs, health=health, today=today, rates=DEFAULT_RATES,
     )
     return HTMLResponse(html)
+
+
+# ── Trade display labels ──
+TRADE_LABELS = {
+    "foundation_concrete": "Foundation / Concrete",
+    "framing": "Framing",
+    "plumbing_rough": "Plumbing Rough",
+    "hvac_rough": "HVAC Rough",
+    "electrical_rough": "Electrical Rough",
+    "drywall_plaster": "Drywall / Plaster",
+    "paint": "Paint",
+    "flooring": "Flooring",
+    "cabinets": "Cabinets",
+    "finish_work": "Finish Work",
+}
+
+
+@router.get("/scorecard", response_class=HTMLResponse)
+async def subcontractor_scorecard(
+    request: Request,
+    sort: str = Query("red_desc", alias="sort"),
+    trade_filter: str = Query("", alias="trade"),
+):
+    """Render the subcontractor performance scorecard."""
+    from app.models.contact import Contact
+
+    async with async_session() as session:
+        # Get all active contacts
+        contact_stmt = select(Contact).where(Contact.is_active == True)
+        contact_result = await session.execute(contact_stmt)
+        contacts = contact_result.scalars().all()
+
+        scorecard = []
+        for c in contacts:
+            if not c.phone and not c.email:
+                continue
+            identifier = c.phone or c.email
+            trade = c.trade or ""
+
+            # Filter by trade
+            if trade_filter and trade != trade_filter:
+                continue
+
+            # Count Red events
+            red_stmt = select(func.count()).select_from(Event).where(
+                Event.outcome == "R",
+                Event.sender_phone == c.phone if c.phone else False,
+            )
+            red = 0
+            if c.phone:
+                red = (await session.execute(
+                    select(func.count()).select_from(Event).where(
+                        Event.outcome == "R", Event.sender_phone == c.phone)
+                )).scalar() or 0
+
+            # Count Yellow events
+            yellow = (await session.execute(
+                select(func.count()).select_from(Event).where(
+                    Event.outcome == "Y", Event.sender_phone == c.phone)
+            )).scalar() or 0 if c.phone else 0
+
+            # Count "Behind" flags — events where this sub was flagged as Behind
+            behind = (await session.execute(
+                select(func.count()).select_from(Event).where(
+                    Event.full_text.like("%Behind%"),
+                    Event.sender_phone == c.phone,
+                )
+            )).scalar() or 0 if c.phone else 0
+
+            # Count corrections applied TO this sub's events
+            corrections = (await session.execute(
+                select(func.count()).select_from(Event).where(
+                    Event.full_text.like("%Classification corrected%"),
+                    Event.trade == trade,
+                )
+            )).scalar() or 0 if trade else 0
+
+            # Average response time — time between outbound check-in and inbound reply
+            avg_response_hours = None
+            # Count delegation assignments for this sub's trade
+            from app.models.schedule_item import ScheduleItem
+            deleg_stmt = select(func.count()).select_from(ScheduleItem).where(
+                ScheduleItem.delegation_status.in_(["delegated", "in_progress", "resolved"]),
+                ScheduleItem.trade == trade,
+            )
+            deleg_count = (await session.execute(deleg_stmt)).scalar() or 0 if trade else 0
+
+            # Delegation completion
+            deleg_done = (await session.execute(
+                select(func.count()).select_from(ScheduleItem).where(
+                    ScheduleItem.delegation_status == "resolved",
+                    ScheduleItem.trade == trade,
+                )
+            )).scalar() or 0 if trade else 0
+
+            scorecard.append({
+                "name": c.name or identifier,
+                "company": c.company or "",
+                "phone": c.phone or "",
+                "trade": trade,
+                "trade_display": TRADE_LABELS.get(trade, trade.replace("_", " ").title()),
+                "red": red,
+                "yellow": yellow,
+                "behind": behind,
+                "corrections": corrections,
+                "avg_response_hours": avg_response_hours,
+                "delegations": deleg_count,
+                "delegations_done": deleg_done,
+                "delegation_rate": round(deleg_done / deleg_count * 100, 0) if deleg_count > 0 else 0,
+                "total_issues": red + yellow,
+            })
+
+        # Sorting
+        sort_key = sort.replace("_desc", "").replace("_asc", "")
+        reverse = sort.endswith("_desc")
+        scorecard.sort(key=lambda x: x.get(sort_key, 0) or 0, reverse=reverse)
+
+    html = _render("admin/scorecard.html",
+        request=request,
+        subs=scorecard,
+        sort=sort,
+        trade_filter=trade_filter,
+        trades=TRADE_LABELS,
+    )
+    return HTMLResponse(html)
