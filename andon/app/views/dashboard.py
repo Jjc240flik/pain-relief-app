@@ -19,6 +19,7 @@ from app.database import get_db
 from app.models.house import House
 from app.models.schedule_item import ScheduleItem
 from app.models.event import Event
+from app.models.contact import Contact
 from app.repositories.schedule_repo import ScheduleRepository
 from app.repositories.base import BaseRepository
 
@@ -115,6 +116,9 @@ async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
         event_result = await session.execute(event_stmt)
         latest_event = event_result.scalar_one_or_none()
 
+        # Get the subcontractor contact info for this trade
+        _sub_name, _sub_phone = await _get_sub_contact(session, item.trade)
+
         rows.append({
             "id": str(item.id),
             "house_id": str(item.house_id),
@@ -127,9 +131,26 @@ async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
             "last_touch_ts": item.last_touch_ts,
             "time_ago": _time_ago(item.last_touch_ts),
             "scheduled_start": item.scheduled_start,
+            "sub_name": _sub_name,
+            "sub_phone": _sub_phone,
         })
 
     return rows
+
+
+async def _get_sub_contact(session: AsyncSession, trade: str) -> tuple[str | None, str | None]:
+    """Look up the subcontractor name and phone for a given trade."""
+    if not trade:
+        return None, None
+    stmt = select(Contact).where(
+        Contact.trade == trade,
+        Contact.is_active == True,  # noqa: E712
+    ).limit(1)
+    result = await session.execute(stmt)
+    contact = result.scalar_one_or_none()
+    if contact:
+        return contact.name, contact.phone
+    return None, None
 
 
 async def _log_action(
@@ -164,11 +185,6 @@ async def _render_rows(session: AsyncSession) -> str:
     """Render just the house rows partial."""
     items = await _get_red_yellow_items(session)
     return _render("partials/house_rows.html", items=items)
-
-
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
 
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request, session: AsyncSession = Depends(get_db)):

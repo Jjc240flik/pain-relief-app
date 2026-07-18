@@ -67,6 +67,14 @@
                      bg-gray-50 text-gray-600 hover:bg-gray-100">
         📅 Date
       </button>
+      {% if item.sub_phone %}
+      <a href="tel:{{ item.sub_phone }}"
+         class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition
+                bg-purple-50 text-purple-700 hover:bg-purple-100"
+         title="Call {{ item.sub_name or 'sub' }} at {{ item.sub_phone }}">
+        📞 Call{% if item.sub_name %} {{ item.sub_name.split()[0] }}{% endif %}
+      </a>
+      {% endif %}
       <button hx-post="/dashboard/{{ item.id }}/escalate"
               hx-target="#house-list" hx-swap="outerHTML"
               class="px-3 py-1.5 text-xs font-medium rounded-lg transition
