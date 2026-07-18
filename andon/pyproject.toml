@@ -1,0 +1,29 @@
+[project]
+name = "andon"
+version = "0.1.0"
+description = "SMS Andon System for home builders"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg",
+    "alembic",
+    "twilio",
+    "sendgrid",
+    "apscheduler",
+    "pytz",
+    "pydantic-settings",
+    "python-dotenv",
+    "httpx",
+    "openai",
+    "structlog",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
