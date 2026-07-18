@@ -302,3 +302,57 @@ async def escalate_item(
 
     html = await _render_rows(session)
     return HTMLResponse(html)
+
+
+@router.post("/dashboard/classify/{event_id}/correct")
+async def correct_classification(
+    request: Request,
+    event_id: UUID,
+    correct_status: str = Query(...),
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    Correction feedback endpoint.
+
+    Jim can mark a previous classification as wrong and set the correct status.
+    Logs the correction as an Event and updates the schedule item status.
+    Used to build a correction log for future classifier tuning.
+
+    Query params:
+      correct_status: 'R', 'Y', or 'G' — what the status SHOULD have been
+    """
+    if correct_status not in ("R", "Y", "G"):
+        return HTMLResponse("Invalid status", status_code=400)
+
+    # Find the original event
+    event_repo = BaseRepository(session, Event)
+    original = await event_repo.get(event_id)
+    if not original:
+        return HTMLResponse("Event not found", status_code=404)
+
+    # Log the correction as a new Event
+    await event_repo.create(
+        direction="outbound",
+        channel="sms",
+        full_text=f"[CLASSIFICATION CORRECTION] Event {event_id}: "
+                  f"original={original.outcome or 'none'} "
+                  f"corrected={correct_status}",
+        house_id=original.house_id,
+        schedule_item_id=original.schedule_item_id,
+        trade=original.trade,
+        outcome=correct_status,
+        triggered_by="pm",
+    )
+
+    # If there's a schedule item, update its status
+    if original.schedule_item_id:
+        schedule_repo = ScheduleRepository(session)
+        await schedule_repo.update(original.schedule_item_id, andon_status=correct_status)
+
+    await session.commit()
+    logger.info("Classification corrected: event=%s original=%s -> %s",
+                event_id, original.outcome, correct_status)
+
+    # Return updated dashboard rows
+    html = await _render_rows(session)
+    return HTMLResponse(html)

@@ -102,17 +102,19 @@ class InboundProcessor:
         trade = schedule_item.trade if schedule_item else contact.trade
 
         # --- Step 4: Classify ---
-        cls_result = self._classifier.classify(full_text)
+        cls_result = self._classifier.classify(full_text, trade=trade)
         logger.info(
-            "Classification: status=%s conf=%.2f selections=%s keyword=%s reply=%s",
+            "Classification: status=%s conf=%.2f selections=%s keyword=%s reply=%s category=%s review=%s",
             cls_result.andon_status, cls_result.confidence,
             cls_result.is_selections_query,
             cls_result.matched_keyword,
             cls_result.structured_reply,
+            cls_result.matched_category,
+            cls_result.needs_review,
         )
 
         # --- Step 5: Update schedule item status ---
-        if cls_result.andon_status and schedule_item:
+        if cls_result.andon_status and schedule_item and not cls_result.needs_review:
             schedule_item.andon_status = cls_result.andon_status
             schedule_item.last_touch_ts = __import__("datetime").datetime.now()
             session.add(schedule_item)
@@ -122,6 +124,10 @@ class InboundProcessor:
             if house:
                 house.overall_status = cls_result.andon_status
                 session.add(house)
+
+        # If needs_review, log but don't change status — Jim will decide
+        if cls_result.needs_review:
+            logger.info("Message flagged for review: confidence=%.2f", cls_result.confidence)
 
         # --- Step 6: Log immutable Event ---
         event = await self._log_event(
