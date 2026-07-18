@@ -1,0 +1,54 @@
+{
+  "Foundation Concrete": {
+    "red_keywords": [
+      "rebar",
+      "pour",
+      "forms blew out"
+    ],
+    "yellow_keywords": [
+      "form",
+      "cure"
+    ]
+  },
+  "Framing": {
+    "red_keywords": [
+      "truss",
+      "rafter",
+      "joist",
+      "truss is cracked"
+    ],
+    "yellow_keywords": []
+  },
+  "Plumbing Rough": {
+    "red_keywords": [],
+    "yellow_keywords": []
+  },
+  "HVAC Rough": {
+    "red_keywords": [],
+    "yellow_keywords": []
+  },
+  "Electrical Rough": {
+    "red_keywords": [],
+    "yellow_keywords": []
+  },
+  "Drywall Plaster": {
+    "red_keywords": [],
+    "yellow_keywords": []
+  },
+  "Paint": {
+    "red_keywords": [],
+    "yellow_keywords": []
+  },
+  "Flooring": {
+    "red_keywords": [],
+    "yellow_keywords": []
+  },
+  "Cabinets": {
+    "red_keywords": [],
+    "yellow_keywords": []
+  },
+  "Finish Work": {
+    "red_keywords": [],
+    "yellow_keywords": []
+  }
+}

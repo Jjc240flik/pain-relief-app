@@ -27,6 +27,50 @@ Operational language sourced from:
 """
 
 from dataclasses import dataclass, field
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Graded keyword rules (loaded from keywords_rules.json)
+# ---------------------------------------------------------------------------
+_GRADED_RULES: dict | None = None
+
+
+def load_graded_rules():
+    """Load graded keyword rules from the persistent JSON file."""
+    global _GRADED_RULES
+    from app.services.keyword_loader import load_rules_from_json
+    _GRADED_RULES = load_rules_from_json()
+
+
+def get_graded_keywords(trade_name: str) -> tuple[list[str], list[str]]:
+    """Get (red_keywords, yellow_keywords) for a trade from graded rules."""
+    global _GRADED_RULES
+    if _GRADED_RULES is None:
+        load_graded_rules()
+    if _GRADED_RULES and trade_name in _GRADED_RULES:
+        rules = _GRADED_RULES[trade_name]
+        return rules.get("red_keywords", []), rules.get("yellow_keywords", [])
+    return [], []
+
+
+# Mapping from internal trade IDs to Excel sheet names
+TRADE_TO_SHEET_NAME = {
+    "foundation_concrete": "Foundation Concrete",
+    "framing": "Framing",
+    "plumbing_rough": "Plumbing Rough",
+    "hvac_rough": "HVAC Rough",
+    "electrical_rough": "Electrical Rough",
+    "drywall_plaster": "Drywall Plaster",
+    "paint": "Paint",
+    "flooring": "Flooring",
+    "cabinets": "Cabinets",
+    "finish_work": "Finish Work",
+}
+
+
+def _trade_to_sheet_name(internal_trade: str) -> str | None:
+    """Convert internal trade ID (e.g. 'foundation_concrete') to Excel sheet name."""
+    return TRADE_TO_SHEET_NAME.get(internal_trade)
 
 # ---------------------------------------------------------------------------
 # Trade risk levels — each trade has a severity multiplier
@@ -375,6 +419,31 @@ class ClassifierEngine:
                     is_selections_query=False, matched_keyword=insp_match,
                     structured_reply=None, trade_specific=True,
                     matched_category="inspection", severity_multiplier=severity,
+                )
+
+        # ── Step 3f: Graded keywords from Excel checklist ──
+        # These are user-curated Red/Yellow terms per trade from the
+        # keywords_and_phrases_checklist.xlsx file. They take priority
+        # over the built-in general lists.
+        trade_key = _trade_to_sheet_name(trade) if trade else None
+        if trade_key:
+            graded_red, graded_yellow = get_graded_keywords(trade_key)
+            g_red_match = self._first_match(cleaned, graded_red)
+            if g_red_match:
+                return ClassificationResult(
+                    andon_status='R', confidence=min(0.95, 0.85 * severity),
+                    is_selections_query=False, matched_keyword=g_red_match,
+                    structured_reply=None, trade_specific=True,
+                    matched_category="graded_red", severity_multiplier=severity,
+                )
+            g_yellow_match = self._first_match(cleaned, graded_yellow)
+            if g_yellow_match:
+                conf = min(0.9, 0.65 * severity)
+                return ClassificationResult(
+                    andon_status='Y', confidence=conf,
+                    is_selections_query=False, matched_keyword=g_yellow_match,
+                    structured_reply=None, trade_specific=True,
+                    matched_category="graded_yellow", severity_multiplier=severity,
                 )
 
         # ── Step 4: Multi-hit scoring for Red keywords ──

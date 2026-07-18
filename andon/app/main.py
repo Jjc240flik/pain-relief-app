@@ -20,6 +20,7 @@ from app.webhooks.sendgrid import router as sendgrid_router
 from app.api import router as api_router
 from app.api.seed import router as seed_router
 from app.api.schedule import router as schedule_router
+from app.api.admin import router as admin_router
 from app.views.dashboard import router as dashboard_router
 from app.services.scheduler import SchedulerService
 
@@ -80,6 +81,7 @@ app.include_router(schedule_router)  # /api/schedule
 app.include_router(dashboard_router) # /dashboard + HTMX actions
 app.include_router(twilio_router)    # /webhooks/twilio/*
 app.include_router(sendgrid_router)  # /webhooks/sendgrid/*
+app.include_router(admin_router)     # /admin/*
 
 # Serve locally stored media files (photos, videos)
 _media_dir = Path(settings.media_dir)
