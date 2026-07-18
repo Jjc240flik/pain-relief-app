@@ -64,6 +64,76 @@ TRADE_NOTES = {
     "framing": "Selective escalation active",
 }
 
+# ── Contextual quick actions per trade ──
+# Each action: {label, icon, action, href_template or message_template}
+CONTEXTUAL_ACTIONS = {
+    "foundation_concrete": [
+        {"label": "Check Cure Time", "icon": "⏱", "action": "prefill_note", "message": "Check cure time status for {address} — has the concrete reached minimum PSI?"},
+        {"label": "Call Concrete Co.", "icon": "📞", "action": "call_contact"},
+        {"label": "Flag Re-pour", "icon": "🔄", "action": "prefill_note", "message": "Possible re-pour needed at {address} — verify with engineer before proceeding."},
+    ],
+    "framing": [
+        {"label": "Check Truss Specs", "icon": "📐", "action": "prefill_note", "message": "Verify truss specifications at {address} — check for damage on delivery."},
+        {"label": "Call Supplier", "icon": "📞", "action": "call_contact"},
+        {"label": "Request Inspection", "icon": "🔍", "action": "prefill_note", "message": "Schedule framing inspection at {address} — ready for review."},
+    ],
+    "plumbing_rough": [
+        {"label": "Check Venting", "icon": "🔧", "action": "prefill_note", "message": "Verify venting is correct at {address} before drywall goes up."},
+        {"label": "Schedule Inspection", "icon": "🔍", "action": "prefill_note", "message": "Plumbing rough-in ready for inspection at {address}."},
+    ],
+    "hvac_rough": [
+        {"label": "Check Ductwork", "icon": "🌀", "action": "prefill_note", "message": "Verify ductwork layout at {address} before drywall enclosure."},
+        {"label": "Schedule Inspection", "icon": "🔍", "action": "prefill_note", "message": "HVAC rough-in ready for inspection at {address}."},
+    ],
+    "electrical_rough": [
+        {"label": "Check Boxes", "icon": "💡", "action": "prefill_note", "message": "Verify all electrical boxes are correctly placed at {address}."},
+        {"label": "Schedule Inspection", "icon": "🔍", "action": "prefill_note", "message": "Electrical rough-in ready for inspection at {address}."},
+    ],
+    "drywall_plaster": [
+        {"label": "Check Moisture", "icon": "💧", "action": "prefill_note", "message": "Check moisture levels at {address} before drywall installation."},
+        {"label": "Flag Delays", "icon": "⏳", "action": "prefill_note", "message": "Drywall crew delayed at {address} — update schedule."},
+    ],
+    "paint": [
+        {"label": "Check Prep Work", "icon": "🎨", "action": "prefill_note", "message": "Verify surface prep complete at {address} before painting starts."},
+        {"label": "Touch-up List", "icon": "📋", "action": "prefill_note", "message": "Compile touch-up items at {address} for final walkthrough."},
+    ],
+    "flooring": [
+        {"label": "Check Subfloor", "icon": "🏗", "action": "prefill_note", "message": "Verify subfloor condition at {address} before flooring installation."},
+        {"label": "Verify Material", "icon": "📦", "action": "prefill_note", "message": "Confirm flooring material has arrived at {address} and is correct."},
+    ],
+    "cabinets": [
+        {"label": "Check Dimensions", "icon": "📏", "action": "prefill_note", "message": "Verify cabinet dimensions at {address} match the plans."},
+        {"label": "Verify Hardware", "icon": "🔩", "action": "prefill_note", "message": "Confirm all cabinet hardware has arrived at {address}."},
+    ],
+    "finish_work": [
+        {"label": "Review Punch List", "icon": "📝", "action": "prefill_note", "message": "Review final punch list items at {address} before sign-off."},
+        {"label": "Schedule Walkthrough", "icon": "👁", "action": "prefill_note", "message": "Schedule final walkthrough at {address} with owner."},
+    ],
+}
+
+# Cleanliness / blocking actions (shown when message contains cleanliness or blocking keywords)
+CONTEXTUAL_ACTIONS["_cleanliness"] = [
+    {"label": "Flag for Cleanup", "icon": "🧹", "action": "prefill_note", "message": "Site cleanup needed at {address} before next trade can start."},
+    {"label": "Notify Next Trade", "icon": "📢", "action": "prefill_note", "message": "Notify next trade that cleanup is in progress at {address} — expect delay."},
+]
+
+
+def _get_contextual_actions(trade: str, last_message: str | None) -> list[dict]:
+    """Return 2-3 contextual actions for a card based on trade and message content."""
+    actions = []
+    msg = (last_message or "").lower()
+
+    # Check for cleanliness/blocking keywords
+    if any(kw in msg for kw in ("clean", "debris", "trash", "mess", "blocking", "cannot start")):
+        actions.extend(CONTEXTUAL_ACTIONS.get("_cleanliness", []))
+
+    # Add trade-specific actions (up to 2)
+    trade_actions = CONTEXTUAL_ACTIONS.get(trade, [])
+    actions.extend(trade_actions[:2])
+
+    # If no contextual actions found, return empty list (no extras shown)
+    return actions[:3]
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -245,6 +315,8 @@ async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
             "delegated_by": item.delegated_by or "",
             "delegation_note": item.delegation_note or "",
             "delegation_status": item.delegation_status or "",
+            # ── Contextual quick actions based on trade + message ──
+            "contextual_actions": _get_contextual_actions(item.trade, latest_event.full_text if latest_event else None),
             # ── Media attachments from ALL recent events (MMS photos/video) ──
             "media_info": all_media,
             "photo_count": sum(1 for m in all_media if m.get("category") == "photo"),

@@ -176,6 +176,24 @@
                      bg-teal-50 text-teal-700 hover:bg-teal-100">
         👥 Delegate
       </button>
+      <!-- Contextual quick actions -->
+      {% if item.contextual_actions %}
+      <div class="w-full flex flex-wrap items-center gap-1.5 mt-1 pt-1 border-t border-dashed border-gray-100">
+        {% for action in item.contextual_actions %}
+          {% if action.action == 'call_contact' and item.sub_phone %}
+          <a href="tel:{{ item.sub_phone }}"
+             class="px-2 py-1 text-[11px] font-medium rounded-lg transition bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+            {{ action.icon }} {{ action.label }}
+          </a>
+          {% elif action.action == 'prefill_note' %}
+          <button onclick="prefillDelegationNote('{{ item.id }}', '{{ action.message.format(address=item.address) | e }}')"
+                  class="px-2 py-1 text-[11px] font-medium rounded-lg transition bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+            {{ action.icon }} {{ action.label }}
+          </button>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
       {% if item.delegation_status and item.delegation_status != 'resolved' %}
       <!-- Delegation update actions (for assigned person) -->
       {% if item.delegation_status == 'delegated' %}

@@ -402,6 +402,12 @@ function submitDelegate() {
   fetch('/dashboard/' + itemId + '/delegate', { method: 'POST', body: form })
     .then(function() { htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'outerHTML'}); });
 }
+
+// ── Contextual actions ──
+function prefillDelegationNote(itemId, note) {
+  openDelegateModal(itemId);
+  document.getElementById('delegate-note').value = note;
+}
 </script>
 
 {% endblock %}
