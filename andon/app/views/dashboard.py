@@ -86,15 +86,20 @@ def _time_ago(dt: datetime | None) -> str | None:
     return f"{days}d ago"
 
 
-def _last_activity_label(latest_event, last_touch_ts):
+def _last_activity_label(latest_event, last_touch_ts, behind_verified=True):
     """Derive a human-readable 'Last Verified' label from the latest event.
 
     Maps structured replies to activity indicators:
       "1"/"yes"/"done"/"complete"/"a"  → ✓ Completed HH:MM
-      "2"/"no"/"partial"               → ⚠ Behind HH:MM
+      "2"/"no"/"partial"               → ⚠ Behind HH:MM (if behind_verified)
+                                         ⚠ Unconfirmed HH:MM (if not verified)
       "3"/"issue..."                   → 🔴 Issue HH:MM
       "b"/"not clean"                  → ⚠ Unclean HH:MM
       Free-form                        → Reported HH:MM
+
+    The `behind_verified` flag implements Option B: only show "Behind"
+    if we actually sent a proactive check-in and got a negative reply or
+    no reply. If no check-in was sent, downgrade to "Unconfirmed".
     """
     if not latest_event and not last_touch_ts:
         return None
@@ -106,7 +111,11 @@ def _last_activity_label(latest_event, last_touch_ts):
     if text in ("1", "yes", "done", "complete", "clean", "a"):
         return f"✓ Completed {time_str}" if time_str else "✓ Completed"
     if text in ("2", "no", "partial"):
-        return f"⚠ Behind {time_str}" if time_str else "⚠ Behind"
+        if behind_verified:
+            return f"⚠ Behind {time_str}" if time_str else "⚠ Behind"
+        else:
+            # Option B: no proactive check-in was sent — soften the label
+            return f"⚠ Unconfirmed {time_str}" if time_str else "⚠ Unconfirmed"
     if text in ("3",) or text.startswith("issue"):
         return f"🔴 Issue {time_str}" if time_str else "🔴 Issue"
     if text in ("b", "not clean"):
@@ -149,6 +158,9 @@ async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
         # Get the subcontractor contact info for this trade
         _sub_name, _sub_phone, _sub_email, _boss_phone = await _get_sub_contact(session, item.trade)
 
+        # ── Evaluate "Behind" status (Option B + C) ──
+        is_behind, behind_verified = await _evaluate_behind_status(session, item, _sub_name)
+
         rows.append({
             "id": str(item.id),
             "house_id": str(item.house_id),
@@ -161,7 +173,7 @@ async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
             "last_message": latest_event.full_text if latest_event else None,
             "last_touch_ts": item.last_touch_ts,
             "time_ago": _time_ago(item.last_touch_ts),
-            "activity_label": _last_activity_label(latest_event, item.last_touch_ts),
+            "activity_label": _last_activity_label(latest_event, item.last_touch_ts, behind_verified),
             "scheduled_start": item.scheduled_start,
             "sub_name": _sub_name,
             "sub_phone": _sub_phone,
@@ -185,6 +197,117 @@ async def _get_sub_contact(session: AsyncSession, trade: str) -> tuple:
     if contact:
         return contact.name, contact.phone, contact.email, contact.manager_phone
     return None, None, None, None
+
+
+# ── Option C threshold: contacts with this many "Behind" marks ──
+HIGH_RISK_THRESHOLD = 3
+
+
+async def _evaluate_behind_status(
+    session: AsyncSession,
+    schedule_item,
+    sub_name: str | None,
+) -> tuple[bool, bool]:
+    """
+    Evaluate whether a schedule item should be flagged as "Behind".
+
+    Implements Option B (Primary Rule) + Option C (History-Based):
+    -----------------------------------------------------------------
+    Option B — Only mark "Behind" if:
+      1. The scheduled start time has passed, AND
+      2. We actually sent a proactive check-in message
+         (Readiness Check or Day-Before Confirmation), AND
+      3. The sub either didn't reply, or replied negatively ("2"/"no"/"partial")
+
+    Option C — If a contact has been marked "Behind" more than
+    HIGH_RISK_THRESHOLD times in the past, apply stricter criteria.
+    """
+    from datetime import date as dt_date
+    if not schedule_item.scheduled_start or schedule_item.scheduled_start > dt_date.today():
+        return False, False
+
+    # ── Check if we sent a proactive check-in ──
+    # First try: same schedule_item_id
+    checkin_stmt = (
+        select(Event)
+        .where(
+            Event.schedule_item_id == schedule_item.id,
+            Event.direction == "outbound",
+            Event.channel == "sms",
+            Event.full_text.like("TLG –%"),
+        )
+        .order_by(desc(Event.timestamp))
+        .limit(1)
+    )
+    checkin_result = await session.execute(checkin_stmt)
+    latest_checkin = checkin_result.scalar_one_or_none()
+
+    # Second try: check by trade + sender phone combination.
+    # Use any recent outbound check-in for this trade regardless of house.
+    if not latest_checkin:
+        checkin_stmt2 = (
+            select(Event)
+            .where(
+                Event.direction == "outbound",
+                Event.channel == "sms",
+                Event.full_text.like("TLG –%"),
+                Event.trade == schedule_item.trade,
+            )
+            .order_by(desc(Event.timestamp))
+            .limit(1)
+        )
+        checkin_result2 = await session.execute(checkin_stmt2)
+        latest_checkin = checkin_result2.scalar_one_or_none()
+
+    sent_checkin = latest_checkin is not None
+
+    # ── Get the last inbound reply after the check-in ──
+    last_reply = None
+    if sent_checkin:
+        reply_stmt = (
+            select(Event)
+            .where(
+                Event.schedule_item_id == schedule_item.id,
+                Event.direction == "inbound",
+                Event.timestamp > latest_checkin.timestamp,
+            )
+            .order_by(desc(Event.timestamp))
+            .limit(1)
+        )
+        reply_result = await session.execute(reply_stmt)
+        last_reply = reply_result.scalar_one_or_none()
+
+    # ── Option C: estimate contact's behind history from events ──
+    behind_count = 0
+    if sub_name:
+        behind_stmt = (
+            select(Event)
+            .where(
+                Event.full_text.like("%Behind%"),
+                Event.direction == "outbound",
+            )
+        )
+        behind_events = await session.execute(behind_stmt)
+        behind_count = len(list(behind_events.scalars().all()))
+    is_high_risk = behind_count >= HIGH_RISK_THRESHOLD
+
+    # ── Apply Option B logic ──
+    if sent_checkin and last_reply:
+        reply_text = (last_reply.full_text or "").strip().lower()
+        if reply_text in ("1", "yes", "done", "complete", "clean", "a"):
+            return False, True
+        elif reply_text in ("2", "no", "partial"):
+            return True, True
+        elif reply_text in ("3",) or reply_text.startswith("issue"):
+            return False, True
+        else:
+            return False, True
+    elif sent_checkin and not last_reply:
+        return True, True
+    else:
+        if is_high_risk:
+            return True, False
+        return False, False
 
 
 async def _log_action(
