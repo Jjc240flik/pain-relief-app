@@ -82,10 +82,11 @@
     <button onclick="closeGallery()"
             class="absolute -top-10 right-0 text-white text-sm hover:text-gray-300 z-10">✕ Close</button>
     <div id="gallery-content" class="flex flex-col items-center gap-4">
-      <img id="gallery-img" class="max-w-full max-h-[80vh] rounded-lg shadow-2xl hidden">
-      <div id="gallery-counter" class="text-white text-sm"></div>
+      <img id="gallery-img" class="max-w-full max-h-[80vh] rounded-lg shadow-2xl" style="display:none">
+      <p id="gallery-loading" class="text-white text-sm">Loading...</p>
     </div>
-    <div id="gallery-nav" class="flex justify-center gap-4 mt-4 hidden">
+    <div id="gallery-position" class="text-white text-sm text-center mt-2"></div>
+    <div id="gallery-nav" class="flex justify-center gap-4 mt-2" style="display:none">
       <button onclick="galleryPrev()" class="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30">← Prev</button>
       <button onclick="galleryNext()" class="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30">Next →</button>
     </div>
@@ -98,7 +99,8 @@
   <div class="relative max-w-3xl mx-4 w-full" onclick="event.stopPropagation()">
     <button onclick="closeVideo()"
             class="absolute -top-10 right-0 text-white text-sm hover:text-gray-300 z-10">✕ Close</button>
-    <video id="video-player" class="w-full max-h-[80vh] rounded-lg shadow-2xl" controls></video>
+    <video id="video-player" class="w-full max-h-[80vh] rounded-lg shadow-2xl" controls style="display:none"></video>
+    <p id="video-loading" class="text-white text-sm text-center py-8">Loading video...</p>
   </div>
 </div>
 
@@ -144,46 +146,69 @@ var galleryIndex = 0;
 
 function openGallery(itemId) {
   var row = document.getElementById('row-' + itemId);
-  if (!row) return;
+  if (!row) { console.warn('Gallery: no row', itemId); return; }
   var btn = row.querySelector('.photo-gallery-btn');
-  if (!btn) return;
+  if (!btn) { console.warn('Gallery: no btn in', itemId); return; }
+  
+  var raw = btn.getAttribute('data-media');
+  if (!raw || raw === '[]') { console.warn('Gallery: no data'); return; }
   
   try {
-    galleryItems = JSON.parse(btn.getAttribute('data-media') || '[]');
-    // Filter to only photos
-    galleryItems = galleryItems.filter(function(m) { return m.category === 'photo' && m.url; });
+    var all = JSON.parse(raw);
+    galleryItems = all.filter(function(m) { return m.category === 'photo' && m.url; });
   } catch(e) {
-    galleryItems = [];
+    console.warn('Gallery: JSON parse failed', e);
+    return;
   }
   
-  if (galleryItems.length === 0) return;
+  if (galleryItems.length === 0) { console.warn('Gallery: no photos'); return; }
   
   galleryIndex = 0;
+  // Show loading, hide nav
+  document.getElementById('gallery-loading').style.display = '';
+  document.getElementById('gallery-img').style.display = 'none';
+  document.getElementById('gallery-nav').style.display = 'none';
+  document.getElementById('gallery-position').textContent = '';
+  
   showGalleryImage();
-  document.getElementById('gallery-modal').classList.remove('hidden');
+  document.getElementById('gallery-modal').style.display = 'flex';
 }
 
 function showGalleryImage() {
   var img = document.getElementById('gallery-img');
-  var counter = document.getElementById('gallery-counter');
+  var pos = document.getElementById('gallery-position');
   var nav = document.getElementById('gallery-nav');
+  var loading = document.getElementById('gallery-loading');
   
   var item = galleryItems[galleryIndex];
-  img.src = item.url;
-  img.classList.remove('hidden');
+  if (!item) return;
   
+  // Set src — when it loads, hide loading and show image
+  img.onload = function() {
+    loading.style.display = 'none';
+    img.style.display = '';
+  };
+  img.onerror = function() {
+    loading.textContent = 'Failed to load image';
+  };
+  img.src = item.url;
+  
+  // Position + nav
   if (galleryItems.length > 1) {
-    counter.textContent = (galleryIndex + 1) + ' of ' + galleryItems.length;
-    nav.classList.remove('hidden');
+    pos.textContent = (galleryIndex + 1) + ' of ' + galleryItems.length;
+    nav.style.display = 'flex';
   } else {
-    counter.textContent = '';
-    nav.classList.add('hidden');
+    pos.textContent = '';
+    nav.style.display = 'none';
   }
 }
 
 function galleryNext() {
   if (galleryIndex < galleryItems.length - 1) {
     galleryIndex++;
+    // Reset to loading state
+    document.getElementById('gallery-loading').style.display = '';
+    document.getElementById('gallery-img').style.display = 'none';
     showGalleryImage();
   }
 }
@@ -191,43 +216,73 @@ function galleryNext() {
 function galleryPrev() {
   if (galleryIndex > 0) {
     galleryIndex--;
+    document.getElementById('gallery-loading').style.display = '';
+    document.getElementById('gallery-img').style.display = 'none';
     showGalleryImage();
   }
 }
 
 function closeGallery() {
-  document.getElementById('gallery-modal').classList.add('hidden');
-  document.getElementById('gallery-img').classList.add('hidden');
+  document.getElementById('gallery-modal').style.display = 'none';
+  document.getElementById('gallery-img').style.display = 'none';
+  document.getElementById('gallery-loading').style.display = '';
   galleryItems = [];
 }
 
 function openVideo(itemId) {
   var row = document.getElementById('row-' + itemId);
-  if (!row) return;
+  if (!row) { console.warn('Video: no row'); return; }
   var btn = row.querySelector('.video-btn');
-  if (!btn) return;
+  if (!btn) { console.warn('Video: no btn'); return; }
+  
+  var raw = btn.getAttribute('data-media');
+  if (!raw || raw === '[]') { console.warn('Video: no data'); return; }
   
   try {
-    var mediaList = JSON.parse(btn.getAttribute('data-media') || '[]');
-    var videoItem = mediaList.find(function(m) { return m.category === 'video' && m.url; });
+    var all = JSON.parse(raw);
+    var videoItem = null;
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].category === 'video' && all[i].url) {
+        videoItem = all[i];
+        break;
+      }
+    }
   } catch(e) {
+    console.warn('Video: JSON parse failed', e);
     return;
   }
   
-  if (!videoItem) return;
+  if (!videoItem) { console.warn('Video: no video found'); return; }
+  
+  // Show loading, then load video
+  document.getElementById('video-loading').style.display = '';
+  document.getElementById('video-player').style.display = 'none';
   
   var player = document.getElementById('video-player');
   player.src = videoItem.url;
+  player.oncanplay = function() {
+    document.getElementById('video-loading').style.display = 'none';
+    player.style.display = '';
+  };
+  player.onerror = function() {
+    document.getElementById('video-loading').textContent = 'Failed to load video';
+  };
   player.load();
-  document.getElementById('video-modal').classList.remove('hidden');
-  player.play();
+  
+  document.getElementById('video-modal').style.display = 'flex';
+  player.play().catch(function(e) {
+    console.warn('Video autoplay blocked (expected on mobile):', e);
+  });
 }
 
 function closeVideo() {
   var player = document.getElementById('video-player');
   player.pause();
   player.src = '';
-  document.getElementById('video-modal').classList.add('hidden');
+  player.style.display = 'none';
+  document.getElementById('video-loading').style.display = '';
+  document.getElementById('video-loading').textContent = 'Loading video...';
+  document.getElementById('video-modal').style.display = 'none';
 }
 
 // ── Classification feedback ──
