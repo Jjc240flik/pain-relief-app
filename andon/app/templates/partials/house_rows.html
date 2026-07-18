@@ -163,6 +163,15 @@
         ⬆ Escalate
       </button>
     </div>
+
+    <!-- Classification feedback widget -->
+    <div class="mt-2 pt-2 border-t border-dashed border-gray-100 flex items-center gap-2 text-xs text-gray-400">
+      <span class="text-gray-400">Was this correct?</span>
+      <button onclick="classifyFeedback('{{ item.id }}', 'correct')"
+              class="hover:text-green-600 transition" title="Yes, correct">👍</button>
+      <button onclick="showCorrectionPicker('{{ item.id }}', '{{ item.last_message | e }}')"
+              class="hover:text-red-600 transition" title="No, wrong">👎</button>
+    </div>
   </div>
 </div>
 {% endfor %}
