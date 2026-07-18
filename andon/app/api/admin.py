@@ -6,6 +6,7 @@ Provides:
   GET  /admin/analytics     — System monitoring and analytics dashboard
 """
 
+import json
 import logging
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
@@ -192,6 +193,7 @@ async def admin_analytics(
         request=request, days=days, usage=usage, usage_trends=trends,
         costs=costs, issues=issues, trade_breakdown=trade_breakdown,
         top_subs=top_subs, health=health, today=today, rates=DEFAULT_RATES,
+        alerts=_check_alerts(_load_alerts(), usage, costs, health),
     )
     return HTMLResponse(html)
 
@@ -458,3 +460,82 @@ async def import_contacts(request: Request):
         import_result=f"Imported: {imported}, Updated: {updated}, Skipped: {skipped}",
     )
     return HTMLResponse(html)
+
+
+# ═══════════════════════════════════════════════════════════════
+# USAGE ALERTS
+# ═══════════════════════════════════════════════════════════════
+
+ALERTS_CONFIG_FILE = Path(__file__).parent.parent.parent / "alerts_config.json"
+
+DEFAULT_ALERTS = {
+    "monthly_spend_limit": 50.0,
+    "monthly_spend_enabled": True,
+    "daily_msg_limit": 200,
+    "daily_msg_enabled": True,
+    "media_storage_limit_mb": 500,
+    "media_storage_enabled": True,
+    "alert_email": "",
+}
+
+
+def _load_alerts() -> dict:
+    if ALERTS_CONFIG_FILE.exists():
+        try:
+            with open(ALERTS_CONFIG_FILE) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return dict(DEFAULT_ALERTS)
+
+
+def _save_alerts(cfg: dict) -> None:
+    with open(ALERTS_CONFIG_FILE, "w") as f:
+        json.dump(cfg, f, indent=2)
+
+
+def _check_alerts(cfg: dict, usage: dict, costs: dict, health: dict) -> list[dict]:
+    alerts = []
+    if cfg.get("monthly_spend_enabled") and costs.get("monthly_projected", 0) > cfg.get("monthly_spend_limit", 9999):
+        alerts.append({"level": "warning", "icon": "💰", "title": "Monthly spend limit exceeded",
+                       "message": f"Projected ${costs['monthly_projected']:.2f} exceeds limit of ${cfg['monthly_spend_limit']:.2f}"})
+    if cfg.get("daily_msg_enabled"):
+        daily_total = usage.get("sms", 0) + usage.get("mms", 0) + usage.get("voice", 0)
+        if daily_total > cfg.get("daily_msg_limit", 9999):
+            alerts.append({"level": "warning", "icon": "📨", "title": "Daily message volume high",
+                           "message": f"{daily_total} messages exceeds limit of {cfg['daily_msg_limit']}"})
+    if cfg.get("media_storage_enabled") and health.get("media_events", 0) > cfg.get("media_storage_limit_mb", 9999):
+        alerts.append({"level": "info", "icon": "📸", "title": "Media storage growing",
+                       "message": f"{health['media_events']} media events exceeds limit of {cfg['media_storage_limit_mb']}"})
+    return alerts
+
+
+@router.get("/alerts", response_class=HTMLResponse)
+async def alerts_page(request: Request):
+    cfg = _load_alerts()
+    html = _render("admin/alerts.html", request=request, cfg=cfg, saved=request.query_params.get("saved", ""))
+    return HTMLResponse(html)
+
+
+@router.post("/alerts/save")
+async def save_alerts(
+    request: Request,
+    monthly_spend_limit: float = Form(50.0),
+    monthly_spend_enabled: str = Form(""),
+    daily_msg_limit: int = Form(200),
+    daily_msg_enabled: str = Form(""),
+    media_storage_limit_mb: int = Form(500),
+    media_storage_enabled: str = Form(""),
+    alert_email: str = Form(""),
+):
+    cfg = {
+        "monthly_spend_limit": monthly_spend_limit,
+        "monthly_spend_enabled": monthly_spend_enabled == "on",
+        "daily_msg_limit": daily_msg_limit,
+        "daily_msg_enabled": daily_msg_enabled == "on",
+        "media_storage_limit_mb": media_storage_limit_mb,
+        "media_storage_enabled": media_storage_enabled == "on",
+        "alert_email": alert_email.strip(),
+    }
+    _save_alerts(cfg)
+    return HTMLResponse("", status_code=303, headers={"Location": "/admin/alerts?saved=1"})

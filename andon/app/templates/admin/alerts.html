@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Admin — Usage Alerts{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-6">
+
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Usage Alerts</h1>
+      <p class="text-sm text-gray-500">Configure thresholds for cost and usage notifications</p>
+    </div>
+    <a href="/admin/analytics" class="text-sm text-blue-600 hover:text-blue-800">← Back to Analytics</a>
+  </div>
+
+  {% if saved %}
+  <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+    ✅ Alert configuration saved.
+  </div>
+  {% endif %}
+
+  <div class="bg-white rounded-xl border border-gray-200 p-6">
+    <form method="post" action="/admin/alerts/save" class="space-y-6">
+
+      <!-- Monthly spend -->
+      <div class="pb-4 border-b border-gray-100">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-medium text-gray-900">💰 Monthly Spend Limit</h3>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" name="monthly_spend_enabled" class="sr-only peer" {% if cfg.monthly_spend_enabled %}checked{% endif %}>
+            <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+          </label>
+        </div>
+        <p class="text-xs text-gray-500 mb-2">Alert when projected monthly spend exceeds this amount.</p>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-600">$</span>
+          <input type="number" name="monthly_spend_limit" value="{{ cfg.monthly_spend_limit }}" step="5" min="0"
+                 class="w-24 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          <span class="text-sm text-gray-500">/ month</span>
+        </div>
+      </div>
+
+      <!-- Daily message volume -->
+      <div class="pb-4 border-b border-gray-100">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-medium text-gray-900">📨 Daily Message Volume</h3>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" name="daily_msg_enabled" class="sr-only peer" {% if cfg.daily_msg_enabled %}checked{% endif %}>
+            <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+          </label>
+        </div>
+        <p class="text-xs text-gray-500 mb-2">Alert when total daily SMS + MMS + Voice exceeds this number.</p>
+        <div class="flex items-center gap-2">
+          <input type="number" name="daily_msg_limit" value="{{ cfg.daily_msg_limit }}" step="50" min="0"
+                 class="w-24 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          <span class="text-sm text-gray-500">messages / day</span>
+        </div>
+      </div>
+
+      <!-- Media storage -->
+      <div class="pb-4 border-b border-gray-100">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-medium text-gray-900">📸 Media Storage Growth</h3>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" name="media_storage_enabled" class="sr-only peer" {% if cfg.media_storage_enabled %}checked{% endif %}>
+            <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+          </label>
+        </div>
+        <p class="text-xs text-gray-500 mb-2">Alert when media events (photos + videos) exceed this count.</p>
+        <div class="flex items-center gap-2">
+          <input type="number" name="media_storage_limit_mb" value="{{ cfg.media_storage_limit_mb }}" step="100" min="0"
+                 class="w-24 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          <span class="text-sm text-gray-500">media events</span>
+        </div>
+      </div>
+
+      <!-- Email notification -->
+      <div>
+        <h3 class="font-medium text-gray-900 mb-2">📧 Email Notifications</h3>
+        <p class="text-xs text-gray-500 mb-2">Send alert notifications to this email address.</p>
+        <input type="email" name="alert_email" value="{{ cfg.alert_email }}"
+               placeholder="owner@example.com"
+               class="w-full max-w-sm px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <a href="/admin/analytics" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</a>
+        <button type="submit" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Settings</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
