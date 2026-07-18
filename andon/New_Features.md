@@ -150,3 +150,35 @@ Key metrics to track would include:
 ### Rationale
 
 Right now, there is no way to measure whether the Andon system is actually reducing Jim's workload. The core dashboard tells him what's wrong *right now*, but it doesn't tell him whether issues are resolving faster than before, which subs are most reliable, or whether the classifier is getting better over time. An internal metrics dashboard turns raw event data into actionable insight — making the system self-improving rather than just reactive.
+
+---
+
+## 6. Plug-in / Integration Layer (Zapier + Builder Platforms)
+
+- **Value:** High
+- **Effort:** Medium–High
+- **Recommendation:** Do not build during active MVP. Add this after the core system (SMS loop, Dashboard, Classifier, and Call button) is stable and Jim is actively using the app daily. This should be treated as a post-MVP capability.
+
+### Description
+
+Make the app "plug-in ready" so it can easily connect with larger existing platforms that home builders already use — QuickBooks, Buildertrend, JobNimbus, ServiceTitan, and similar tools. The goal is to allow the Andon system to push and receive data from other systems instead of forcing builders to manage everything inside a single app.
+
+Initial focus should be on **outbound integrations** — the app can send real-time events (new Red/Yellow issues, status changes, resolutions, etc.) to external systems when they happen. Over time, support **inbound actions** (e.g. creating an issue from another platform or updating a schedule status via API).
+
+Ideally, offer a native **Zapier integration** so non-technical users can easily connect the app to hundreds of other tools without any custom development.
+
+### Future Considerations
+
+- Start with a clean **outbound webhook system** — the app fires structured JSON events to configurable external URLs when key actions occur (new issue, status change, resolution, escalation)
+- Add **API key authentication** so external platforms can securely interact with the app
+- Build a proper **public REST API** (even if simple at first, with documented endpoints)
+- Eventually create a **Zapier app** so users can set up automations like:
+  - *"When a new Red issue is created → Create a task in Buildertrend"*
+  - *"When an issue is resolved → Update QuickBooks job status"*
+  - *"When a sub is flagged Behind → Send a Slack alert"*
+- Support both **push** (app sends data out) and **pull** (external apps query the app's data) capabilities
+- Becomes especially valuable once multiple builders are using the system, as different companies will want to connect it to different tools
+
+### Rationale
+
+No home builder runs their entire operation inside a single app. They use QuickBooks for accounting, Buildertrend for project management, Slack for team chat, and dozens of other tools. If the Andon system is a closed silo, it becomes a *separate place* Jim has to check — which adds friction rather than removing it. A Zapier integration layer lets the app fit into whatever workflow Jim's team already has, turning it from a standalone tool into a piece of their broader operational stack.
