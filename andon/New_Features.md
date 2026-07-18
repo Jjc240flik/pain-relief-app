@@ -176,3 +176,39 @@ Ideally, offer a native **Zapier integration** so non-technical users can easily
 ### Rationale
 
 No home builder runs their entire operation inside a single app. They use QuickBooks for accounting, Buildertrend for project management, Slack for team chat, and dozens of other tools. If the Andon system is a closed silo, it becomes a *separate place* Jim has to check — which adds friction rather than removing it. A Zapier integration layer lets the app fit into whatever workflow Jim's team already has, turning it from a standalone tool into a piece of their broader operational stack.
+
+---
+
+## 7. Usage Monitoring & Alerts (Cost & Performance Tracking)
+
+- **Value:** Medium–High
+- **Effort:** Medium
+- **Recommendation:** Add after the core system (SMS loop, Dashboard, Classifier, and media handling) is stable and Jim is actively using the app daily. This becomes more important once multiple builders or higher message volume is involved.
+
+### Description
+
+Create a protected internal section (or page) that allows Jim (and other admin users) to monitor how the system is being used. The goal is to provide visibility into usage patterns and help control costs at scale — especially around Twilio (SMS/MMS/Voice), OpenAI Whisper (transcription), and media storage.
+
+Key metrics to track should include:
+
+- **Message volume** — Total SMS, Email, and Voice messages sent and received over time (daily / weekly / monthly)
+- **Media usage** — Number of photos and videos stored, total storage consumed
+- **Issue velocity** — Number of Red and Yellow issues created per day or week
+- **Classifier accuracy** — How often Jim corrects classifications (correction rate over time)
+- **Resolution speed** — Average time from issue flagged to issue resolved
+
+Add the ability to set simple **usage alerts** — for example, notify Jim when monthly SMS volume exceeds a certain threshold, or when storage consumption grows unusually fast.
+
+All data should be retained until the project is marked as complete.
+
+### Future Considerations
+
+- Add charts and graphs for better visualisation of trends over time
+- Allow filtering by trade, subcontractor, or house
+- Support export of usage reports (CSV or PDF)
+- Eventually allow multiple internal users with different permission levels to view usage data
+- Add more advanced cost forecasting (e.g. projected monthly spend based on current usage patterns)
+
+### Rationale
+
+Right now, there is no way to see whether the system is being used efficiently or whether costs are growing as expected. Twilio charges per SMS segment, per MMS, and per minute of voice — and OpenAI charges per minute of audio transcribed. Without visibility into these numbers, cost overruns only get noticed when the bill arrives. A usage monitoring page gives Jim the data he needs to manage costs proactively rather than reactively.
