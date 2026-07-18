@@ -240,6 +240,11 @@ async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
             "sub_phone": _sub_phone,
             "sub_email": _sub_email,
             "boss_phone": _boss_phone,
+            # ── Delegation info ──
+            "delegated_to": item.delegated_to or "",
+            "delegated_by": item.delegated_by or "",
+            "delegation_note": item.delegation_note or "",
+            "delegation_status": item.delegation_status or "",
             # ── Media attachments from ALL recent events (MMS photos/video) ──
             "media_info": all_media,
             "photo_count": sum(1 for m in all_media if m.get("category") == "photo"),
@@ -540,6 +545,82 @@ async def escalate_item(
     html = await _render_rows(session)
     return HTMLResponse(html)
 
+
+# ── Team members available for delegation ──
+TEAM_MEMBERS = [
+    {"name": "Brian (Owner)", "role": "owner"},
+    {"name": "Clint (Foreman)", "role": "foreman"},
+    {"name": "Office Admin", "role": "admin"},
+    {"name": "Interior Designer", "role": "designer"},
+]
+
+
+@router.post("/dashboard/{item_id}/delegate")
+async def delegate_item(
+    request: Request,
+    item_id: UUID,
+    delegated_to: str = Form(""),
+    delegation_note: str = Form(""),
+    session: AsyncSession = Depends(get_db),
+):
+    """Delegate an issue to one or more internal team members."""
+    repo = ScheduleRepository(session)
+    item = await repo.get(item_id)
+    if not item:
+        return HTMLResponse("", status_code=404)
+
+    await repo.update(
+        item_id,
+        delegated_to=delegated_to,
+        delegated_by="Jim (PM)",
+        delegation_note=delegation_note,
+        delegation_status="delegated",
+    )
+
+    detail = f"Delegated to: {delegated_to}"
+    if delegation_note:
+        detail += f" | Note: {delegation_note}"
+    await _log_action(session, item_id, detail, "Delegation")
+
+    await session.commit()
+
+    html = await _render_rows(session)
+    return HTMLResponse(html)
+
+
+@router.post("/dashboard/{item_id}/delegation-update")
+async def update_delegation_status(
+    request: Request,
+    item_id: UUID,
+    new_status: str = Form(""),
+    session: AsyncSession = Depends(get_db),
+):
+    """Update the delegation status (In Progress, Resolved, Reclaimed)."""
+    repo = ScheduleRepository(session)
+    item = await repo.get(item_id)
+    if not item:
+        return HTMLResponse("", status_code=404)
+
+    if new_status == "reclaimed":
+        await repo.update(
+            item_id,
+            delegated_to="",
+            delegated_by="",
+            delegation_note="",
+            delegation_status="",
+        )
+        await _log_action(session, item_id, "Delegation reclaimed by PM", "Delegation")
+    elif new_status == "resolved":
+        await repo.update(item_id, delegation_status="resolved")
+        await _log_action(session, item_id, "Delegation marked resolved", "Delegation")
+    elif new_status == "in_progress":
+        await repo.update(item_id, delegation_status="in_progress")
+        await _log_action(session, item_id, "Delegation marked in progress", "Delegation")
+
+    await session.commit()
+
+    html = await _render_rows(session)
+    return HTMLResponse(html)
 
 @router.post("/dashboard/classify/{event_id}/correct")
 async def correct_classification(

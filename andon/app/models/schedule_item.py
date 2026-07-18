@@ -33,6 +33,10 @@ class ScheduleItem(Base):
     )
     cleanup_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
     readiness_lead_days: Mapped[int] = mapped_column(Integer, default=7)
+    delegated_to: Mapped[str] = mapped_column(String, default="")       # JSON array or comma-separated names
+    delegated_by: Mapped[str] = mapped_column(String, default="")
+    delegation_note: Mapped[str] = mapped_column(String, default="")
+    delegation_status: Mapped[str] = mapped_column(String, default="")  # delegated, in_progress, resolved, reclaimed
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMPTZ(timezone=True), server_default=func.now()
     )

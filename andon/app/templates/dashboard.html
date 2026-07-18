@@ -104,6 +104,49 @@
   </div>
 </div>
 
+<!-- ── DELEGATION MODAL ── -->
+<div id="delegate-modal" class="fixed inset-0 z-30 hidden bg-black/30 flex items-center justify-center"
+     onclick="event.target===this&&closeDelegateModal()">
+  <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4" onclick="event.stopPropagation()">
+    <h3 class="font-semibold text-lg mb-3">Delegate Issue</h3>
+    <form id="delegate-form">
+      <input type="hidden" name="item_id" id="delegate-item-id">
+      
+      <label class="block text-sm font-medium text-gray-700 mb-2">Assign to:</label>
+      <div class="space-y-2 mb-4">
+        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 p-1.5 rounded">
+          <input type="checkbox" name="delegated_to" value="Brian (Owner)" class="rounded border-gray-300">
+          Brian (Owner)
+        </label>
+        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 p-1.5 rounded">
+          <input type="checkbox" name="delegated_to" value="Clint (Foreman)" class="rounded border-gray-300">
+          Clint (Foreman)
+        </label>
+        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 p-1.5 rounded">
+          <input type="checkbox" name="delegated_to" value="Office Admin" class="rounded border-gray-300">
+          Office Admin
+        </label>
+        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 p-1.5 rounded">
+          <input type="checkbox" name="delegated_to" value="Interior Designer" class="rounded border-gray-300">
+          Interior Designer
+        </label>
+      </div>
+
+      <label class="block text-sm font-medium text-gray-700 mb-1">Note / Instructions:</label>
+      <textarea id="delegate-note" rows="2"
+                placeholder="e.g. Please call this sub and confirm material arrival"
+                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 mb-4"></textarea>
+
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="closeDelegateModal()"
+                class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+        <button type="button" onclick="submitDelegate()"
+                class="px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700">Delegate</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 function openDatePicker(itemId) {
   document.getElementById('modal-item-id').value = itemId;
@@ -332,6 +375,32 @@ function cancelCorrection(itemId) {
   document.getElementById('fb-comment-' + itemId).value = '';
   document.getElementById('fb-comment-' + itemId).style.borderColor = '#d1d5db';
   document.getElementById('fb-comment-' + itemId).placeholder = 'Optional reason...';
+}
+
+// ── Delegation ──
+function openDelegateModal(itemId) {
+  document.getElementById('delegate-item-id').value = itemId;
+  document.getElementById('delegate-modal').style.display = 'flex';
+  var checkboxes = document.querySelectorAll('#delegate-form input[type="checkbox"]');
+  for (var i = 0; i < checkboxes.length; i++) { checkboxes[i].checked = false; }
+  document.getElementById('delegate-note').value = '';
+}
+function closeDelegateModal() {
+  document.getElementById('delegate-modal').style.display = 'none';
+}
+function submitDelegate() {
+  var itemId = document.getElementById('delegate-item-id').value;
+  var selected = [];
+  var checkboxes = document.querySelectorAll('#delegate-form input[type="checkbox"]:checked');
+  for (var i = 0; i < checkboxes.length; i++) { selected.push(checkboxes[i].value); }
+  if (selected.length === 0) { alert('Please select at least one person.'); return; }
+  var note = document.getElementById('delegate-note').value.trim();
+  var form = new FormData();
+  form.append('delegated_to', selected.join(', '));
+  form.append('delegation_note', note);
+  closeDelegateModal();
+  fetch('/dashboard/' + itemId + '/delegate', { method: 'POST', body: form })
+    .then(function() { htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'outerHTML'}); });
 }
 </script>
 
