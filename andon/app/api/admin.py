@@ -11,14 +11,16 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Form, Query, Request, Response
 from fastapi.responses import HTMLResponse
 from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 
 from app.database import async_session, get_db
 from app.models.event import Event
 from app.models.schedule_item import ScheduleItem
+from app.repositories.base import BaseRepository
 from app.services.keyword_loader import load_keywords_from_excel, format_report
 from app.services.classifier import load_graded_rules
 from app.views.dashboard import _render  # Reuse Jinja2 rendering
@@ -315,5 +317,144 @@ async def subcontractor_scorecard(
         sort=sort,
         trade_filter=trade_filter,
         trades=TRADE_LABELS,
+    )
+    return HTMLResponse(html)
+
+
+# ── CSV import helper ──
+def _parse_csv_contacts(content: str) -> list[dict]:
+    import csv, io
+    reader = csv.DictReader(io.StringIO(content))
+    contacts = []
+    for row in reader:
+        name = (row.get("name") or row.get("Name") or "").strip()
+        if not name:
+            continue
+        contacts.append({
+            "name": name,
+            "company": (row.get("company") or row.get("Company") or "").strip(),
+            "trade": (row.get("trade") or row.get("Trade") or "").strip().lower().replace(" ", "_"),
+            "phone": (row.get("phone") or row.get("Phone") or "").strip(),
+            "email": (row.get("email") or row.get("Email") or "").strip().lower(),
+            "manager_phone": (row.get("manager_phone") or row.get("Manager Phone") or "").strip(),
+            "notes": (row.get("notes") or row.get("Notes") or "").strip(),
+        })
+    return contacts
+
+
+@router.get("/contacts", response_class=HTMLResponse)
+async def list_contacts(
+    request: Request,
+    search: str = Query("", alias="q"),
+    trade: str = Query("", alias="trade"),
+):
+    from app.models.contact import Contact
+    async with async_session() as session:
+        stmt = select(Contact).where(Contact.is_active == True).order_by(Contact.name)
+        if trade:
+            stmt = stmt.where(Contact.trade == trade)
+        result = await session.execute(stmt)
+        candidates = result.scalars().all()
+        search_lower = search.strip().lower()
+        if search_lower:
+            candidates = [c for c in candidates if (
+                search_lower in (c.name or "").lower()
+                or search_lower in (c.company or "").lower()
+                or search_lower in (c.phone or "")
+                or search_lower in (c.email or "").lower())]
+
+    html = _render("admin/contacts.html",
+        request=request, contacts=candidates,
+        search=search, trade_filter=trade, trades=TRADE_LABELS,
+    )
+    return HTMLResponse(html)
+
+
+@router.post("/contacts/add")
+async def add_contact(
+    request: Request,
+    name: str = Form(""), company: str = Form(""),
+    trade: str = Form(""), phone: str = Form(""),
+    email: str = Form(""), manager_phone: str = Form(""),
+    notes: str = Form(""),
+):
+    from app.models.contact import Contact
+    if not name.strip():
+        return HTMLResponse("Name required", status_code=400)
+    async with async_session() as session:
+        repo = BaseRepository(session, Contact)
+        await repo.create(name=name.strip(), company=company.strip(),
+            trade=trade.strip(), phone=phone.strip(),
+            email=email.strip().lower(), manager_phone=manager_phone.strip(),
+            notes=notes.strip(), is_active=True)
+        await session.commit()
+    return HTMLResponse("", status_code=303, headers={"Location": "/admin/contacts"})
+
+
+@router.post("/contacts/{contact_id}/edit")
+async def edit_contact(
+    request: Request, contact_id: UUID,
+    name: str = Form(""), company: str = Form(""),
+    trade: str = Form(""), phone: str = Form(""),
+    email: str = Form(""), manager_phone: str = Form(""),
+    notes: str = Form(""),
+):
+    from app.models.contact import Contact
+    async with async_session() as session:
+        repo = BaseRepository(session, Contact)
+        if not await repo.get(contact_id):
+            return HTMLResponse("Not found", status_code=404)
+        await repo.update(contact_id,
+            name=name.strip(), company=company.strip(), trade=trade.strip(),
+            phone=phone.strip(), email=email.strip().lower(),
+            manager_phone=manager_phone.strip(), notes=notes.strip())
+        await session.commit()
+    return HTMLResponse("", status_code=303, headers={"Location": "/admin/contacts"})
+
+
+@router.post("/contacts/{contact_id}/delete")
+async def delete_contact(request: Request, contact_id: UUID):
+    from app.models.contact import Contact
+    async with async_session() as session:
+        repo = BaseRepository(session, Contact)
+        await repo.update(contact_id, is_active=False)
+        await session.commit()
+    return HTMLResponse("", status_code=303, headers={"Location": "/admin/contacts"})
+
+
+@router.post("/contacts/import")
+async def import_contacts(request: Request):
+    from app.models.contact import Contact
+    form = await request.form()
+    file = form.get("file")
+    if not file:
+        return HTMLResponse("No file", status_code=400)
+    text = (await file.read()).decode("utf-8-sig")
+    contacts = _parse_csv_contacts(text)
+    if not contacts:
+        return HTMLResponse("No valid contacts", status_code=400)
+
+    imported = updated = skipped = 0
+    async with async_session() as session:
+        repo = BaseRepository(session, Contact)
+        for c in contacts:
+            if not c["phone"] and not c["email"]:
+                skipped += 1; continue
+            existing = None
+            if c["phone"]:
+                existing = (await session.execute(
+                    select(Contact).where(Contact.phone == c["phone"]))).scalar_one_or_none()
+            if existing:
+                await repo.update(existing.id, **c)
+                updated += 1
+            else:
+                await repo.create(**c, is_active=True)
+                imported += 1
+        await session.commit()
+
+    # Re-render with result message
+    html = _render("admin/contacts.html",
+        request=request, contacts=[], search="", trade_filter="", trades=TRADE_LABELS,
+        import_result=f"Imported: {imported}, Updated: {updated}, Skipped: {skipped}",
     )
     return HTMLResponse(html)
