@@ -75,6 +75,33 @@
   </div>
 </div>
 
+<!-- ── PHOTO GALLERY MODAL ── -->
+<div id="gallery-modal" class="fixed inset-0 z-30 hidden bg-black/80 flex items-center justify-center"
+     onclick="event.target===this&&closeGallery()">
+  <div class="relative max-w-3xl mx-4 w-full" onclick="event.stopPropagation()">
+    <button onclick="closeGallery()"
+            class="absolute -top-10 right-0 text-white text-sm hover:text-gray-300 z-10">✕ Close</button>
+    <div id="gallery-content" class="flex flex-col items-center gap-4">
+      <img id="gallery-img" class="max-w-full max-h-[80vh] rounded-lg shadow-2xl hidden">
+      <div id="gallery-counter" class="text-white text-sm"></div>
+    </div>
+    <div id="gallery-nav" class="flex justify-center gap-4 mt-4 hidden">
+      <button onclick="galleryPrev()" class="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30">← Prev</button>
+      <button onclick="galleryNext()" class="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIDEO MODAL ── -->
+<div id="video-modal" class="fixed inset-0 z-30 hidden bg-black/80 flex items-center justify-center"
+     onclick="event.target===this&&closeVideo()">
+  <div class="relative max-w-3xl mx-4 w-full" onclick="event.stopPropagation()">
+    <button onclick="closeVideo()"
+            class="absolute -top-10 right-0 text-white text-sm hover:text-gray-300 z-10">✕ Close</button>
+    <video id="video-player" class="w-full max-h-[80vh] rounded-lg shadow-2xl" controls></video>
+  </div>
+</div>
+
 <script>
 function openDatePicker(itemId) {
   document.getElementById('modal-item-id').value = itemId;
@@ -110,6 +137,55 @@ document.addEventListener('click', function() {
 setInterval(function() {
   htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'outerHTML'});
 }, 60000);
+
+// ── Media gallery state ──
+var galleryItems = [];
+var galleryIndex = 0;
+
+function openGallery(itemId) {
+  // For MVP: media data is embedded in the button's data attributes
+  // For now, show a placeholder — real integration requires passing media URLs
+  // to the template context, which is done via item.media_info
+  var row = document.getElementById('row-' + itemId);
+  if (!row) return;
+  // Find the media info from the data attribute
+  var btn = row.querySelector('[onclick*=\"openGallery\"]');
+  if (!btn) return;
+  
+  // Simple gallery for MVP — fetch media from the event's raw_payload
+  // TODO: Phase 2 — pass full media URLs via data attributes
+  var img = document.getElementById('gallery-img');
+  var counter = document.getElementById('gallery-counter');
+  var nav = document.getElementById('gallery-nav');
+  
+  // For now, use the Twilio media URL from the raw_payload
+  // This is a simplified MVP version
+  img.src = ''; // Will be populated from backend data
+  img.classList.add('hidden');
+  nav.classList.add('hidden');
+  counter.textContent = 'Photos coming soon — full gallery in next update';
+  
+  document.getElementById('gallery-modal').classList.remove('hidden');
+}
+
+function closeGallery() {
+  document.getElementById('gallery-modal').classList.add('hidden');
+}
+
+function openVideo(itemId) {
+  var player = document.getElementById('video-player');
+  // MVP: video playback requires the media URL from the event
+  // For now show a placeholder message
+  player.innerHTML = '<p class=\"text-white text-center py-8\">Video playback coming soon</p>';
+  document.getElementById('video-modal').classList.remove('hidden');
+}
+
+function closeVideo() {
+  var player = document.getElementById('video-player');
+  player.pause();
+  player.src = '';
+  document.getElementById('video-modal').classList.add('hidden');
+}
 </script>
 
 {% endblock %}

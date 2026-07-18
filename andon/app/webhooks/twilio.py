@@ -74,23 +74,48 @@ async def inbound_sms(request: Request) -> Response:
     message_sid = payload.get("MessageSid", "")
     num_media = int(payload.get("NumMedia", 0) or 0)
 
-    # ── Handle MMS media attachments ──
+    # ── Handle MMS media attachments (up to 5) ──
     media_info = []
+    has_video = False
+    photo_count = 0
     if num_media > 0:
-        for i in range(num_media):
+        max_media = min(num_media, 5)
+        for i in range(max_media):
             media_url = payload.get(f"MediaUrl{i}", "")
             media_type = payload.get(f"MediaContentType{i}", "")
             media_sid = payload.get(f"MediaSid{i}", "")
-            if media_url:
-                media_info.append({
-                    "url": media_url,
-                    "content_type": media_type,
-                    "sid": media_sid,
+            if not media_url:
+                continue
+
+            entry = {"original_url": media_url, "content_type": media_type,
+                     "sid": media_sid, "index": i}
+
+            # Store media permanently (S3 or local)
+            if settings.twilio_account_sid and settings.twilio_auth_token:
+                from app.services.media_store import store_media
+                stored = await store_media(media_url, media_type, media_sid, i)
+                entry.update({
+                    "permanent_url": stored.get("permanent_url", media_url),
+                    "category": stored.get("category", "other"),
+                    "filename": stored.get("filename", ""),
+                    "file_size": stored.get("file_size", 0),
+                    "stored": stored.get("stored", "pending"),
+                    "url": stored.get("permanent_url", media_url),
                 })
+            else:
+                entry["category"] = "photo" if "image" in media_type else "video"
+                entry["url"] = media_url
+                entry["stored"] = "twilio_url"
+
+            media_info.append(entry)
+            if entry.get("category") == "video":
+                has_video = True
+            else:
+                photo_count += 1
 
         logger.info(
-            "Inbound MMS: from=%s media=%d body=%s",
-            sender, num_media, message_text[:100],
+            "Inbound MMS: from=%s media=%d photos=%d videos=%s body=%s",
+            sender, num_media, photo_count, has_video, message_text[:100],
         )
     else:
         logger.info("Inbound SMS: from=%s body=%s", sender, message_text[:200])

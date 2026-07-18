@@ -8,8 +8,11 @@ import logging
 
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.webhooks.twilio import router as twilio_router
@@ -77,3 +80,8 @@ app.include_router(schedule_router)  # /api/schedule
 app.include_router(dashboard_router) # /dashboard + HTMX actions
 app.include_router(twilio_router)    # /webhooks/twilio/*
 app.include_router(sendgrid_router)  # /webhooks/sendgrid/*
+
+# Serve locally stored media files (photos, videos)
+_media_dir = Path(settings.media_dir)
+_media_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=str(_media_dir)), name="media")

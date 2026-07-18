@@ -148,6 +148,26 @@ def _last_activity_label(latest_event, last_touch_ts, behind_verified=True):
     return f"📝 Message Received {time_str}" if time_str else "📝 Message Received"
 
 
+def _parse_media_info(latest_event) -> list[dict]:
+    """Extract media attachment info from an event's raw_payload."""
+    if not latest_event or not latest_event.raw_payload:
+        return []
+    raw = latest_event.raw_payload
+    if isinstance(raw, dict):
+        media = raw.get("media")
+        if isinstance(media, list):
+            return media
+    return []
+
+
+def _count_media_by_type(latest_event, category: str) -> int:
+    """Count media attachments of a specific category (photo/video)."""
+    return sum(
+        1 for m in _parse_media_info(latest_event)
+        if m.get("category") == category
+    )
+
+
 async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
     """Query all schedule items with R or Y status, joined with houses and latest event."""
     stmt = (
@@ -202,6 +222,10 @@ async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
             "sub_phone": _sub_phone,
             "sub_email": _sub_email,
             "boss_phone": _boss_phone,
+            # ── Media attachments from latest event (MMS photos/video) ──
+            "media_info": _parse_media_info(latest_event),
+            "photo_count": _count_media_by_type(latest_event, "photo"),
+            "has_video": _count_media_by_type(latest_event, "video") > 0,
         })
 
     return rows
