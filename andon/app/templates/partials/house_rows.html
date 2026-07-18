@@ -18,7 +18,9 @@
     <!-- Row header: address + badge -->
     <div class="flex items-start justify-between gap-2 mb-2">
       <div class="min-w-0 flex-1">
-        <h3 class="font-semibold text-gray-900 truncate text-base">{{ item.address }}</h3>
+        <h3 class="font-semibold text-gray-900 truncate text-base">
+          {% if item.city %}{{ item.city }} — {% endif %}{{ item.address }}
+        </h3>
         <p class="text-sm text-gray-500">{{ item.trade_display }}</p>
       </div>
       <span class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold
@@ -36,9 +38,10 @@
     </div>
     {% endif %}
 
-    <!-- Meta: time + trade note -->
+    <!-- Meta: time + activity label + trade note -->
     <div class="flex flex-wrap items-center gap-3 text-xs text-gray-400 mb-3">
       {% if item.time_ago %}<span>{{ item.time_ago }}</span>{% endif %}
+      {% if item.activity_label %}<span class="text-gray-500 font-medium">{{ item.activity_label }}</span>{% endif %}
       {% if item.trade_note %}<span class="italic">{{ item.trade_note }}</span>{% endif %}
     </div>
 

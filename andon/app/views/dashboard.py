@@ -86,13 +86,43 @@ def _time_ago(dt: datetime | None) -> str | None:
     return f"{days}d ago"
 
 
+def _last_activity_label(latest_event, last_touch_ts):
+    """Derive a human-readable 'Last Verified' label from the latest event.
+
+    Maps structured replies to activity indicators:
+      "1"/"yes"/"done"/"complete"/"a"  → ✓ Completed HH:MM
+      "2"/"no"/"partial"               → ⚠ Behind HH:MM
+      "3"/"issue..."                   → 🔴 Issue HH:MM
+      "b"/"not clean"                  → ⚠ Unclean HH:MM
+      Free-form                        → Reported HH:MM
+    """
+    if not latest_event and not last_touch_ts:
+        return None
+    ts = latest_event.timestamp if latest_event else last_touch_ts
+    time_str = ts.strftime("%-I:%M %p").lower() if hasattr(ts, 'strftime') else ""
+    if not latest_event or not latest_event.full_text:
+        return f"Updated {time_str}" if time_str else None
+    text = latest_event.full_text.strip().lower()
+    if text in ("1", "yes", "done", "complete", "clean", "a"):
+        return f"✓ Completed {time_str}" if time_str else "✓ Completed"
+    if text in ("2", "no", "partial"):
+        return f"⚠ Behind {time_str}" if time_str else "⚠ Behind"
+    if text in ("3",) or text.startswith("issue"):
+        return f"🔴 Issue {time_str}" if time_str else "🔴 Issue"
+    if text in ("b", "not clean"):
+        return f"⚠ Unclean {time_str}" if time_str else "⚠ Unclean"
+    if text.startswith("not ready"):
+        return f"🔴 Not ready {time_str}" if time_str else "🔴 Not ready"
+    return f"Reported {time_str}" if time_str else "Reported"
+
+
 async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
     """Query all schedule items with R or Y status, joined with houses and latest event."""
     stmt = (
         select(ScheduleItem)
         .options(selectinload(ScheduleItem.house))
         .where(ScheduleItem.andon_status.in_(["R", "Y"]))
-        .order_by(desc(ScheduleItem.last_touch_ts))
+        .order_by(ScheduleItem.last_touch_ts.asc().nullslast())
     )
     result = await session.execute(stmt)
     items = result.scalars().all()
@@ -123,6 +153,7 @@ async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
             "id": str(item.id),
             "house_id": str(item.house_id),
             "address": house.address,
+            "city": house.city or "",
             "trade": item.trade,
             "trade_display": TRADE_LABELS.get(item.trade, item.trade.replace("_", " ").title()),
             "trade_note": TRADE_NOTES.get(item.trade),
@@ -130,6 +161,7 @@ async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
             "last_message": latest_event.full_text if latest_event else None,
             "last_touch_ts": item.last_touch_ts,
             "time_ago": _time_ago(item.last_touch_ts),
+            "activity_label": _last_activity_label(latest_event, item.last_touch_ts),
             "scheduled_start": item.scheduled_start,
             "sub_name": _sub_name,
             "sub_phone": _sub_phone,
