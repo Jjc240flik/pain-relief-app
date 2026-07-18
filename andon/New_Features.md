@@ -2,6 +2,16 @@
 
 This document captures high-value ideas that were discussed during development of the SMS Andon System but are not part of the current MVP scope. They are captured here for visibility, prioritisation, and planning — not as active commitments. Each entry includes a value assessment, effort estimate, and recommendation to help decide when to pick them up.
 
+### How to Remove or Archive Features
+
+To keep this document clean and relevant:
+
+- If a feature is **no longer needed or has been built**, move it to a new section at the bottom called **"Archived / Removed Features"**. Add the date and a short reason why it was removed or archived.
+- **Do not delete entries completely** unless they were added by mistake. Keeping history helps with future decision-making.
+- If a feature is **partially built or deprioritized**, move it to **"On Hold"** or **"Deferred"** instead of deleting it.
+
+This keeps the document useful as a living backlog rather than becoming cluttered with outdated ideas.
+
 ---
 
 ## 1. "Last Verified" Activity Indicators
