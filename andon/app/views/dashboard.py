@@ -89,40 +89,63 @@ def _time_ago(dt: datetime | None) -> str | None:
 def _last_activity_label(latest_event, last_touch_ts, behind_verified=True):
     """Derive a human-readable 'Last Verified' label from the latest event.
 
-    Maps structured replies to activity indicators:
-      "1"/"yes"/"done"/"complete"/"a"  → ✓ Completed HH:MM
-      "2"/"no"/"partial"               → ⚠ Behind HH:MM (if behind_verified)
-                                         ⚠ Unconfirmed HH:MM (if not verified)
-      "3"/"issue..."                   → 🔴 Issue HH:MM
-      "b"/"not clean"                  → ⚠ Unclean HH:MM
-      Free-form                        → Reported HH:MM
-
-    The `behind_verified` flag implements Option B: only show "Behind"
-    if we actually sent a proactive check-in and got a negative reply or
-    no reply. If no check-in was sent, downgrade to "Unconfirmed".
+    Maps structured replies to descriptive activity indicators:
+      "1"/"yes"                       → ✓ Onsite HH:MM
+      "done"/"complete"/"a"           → ✓ Completed HH:MM
+      "2"/"no"/"partial" (verified)   → ⚠ Behind HH:MM
+      "2"/"no"/"partial" (unverified) → ⚠ Unconfirmed HH:MM
+      "3"/"issue..."                  → 🔴 Issue Reported HH:MM
+      "b"/"not clean"                 → ⚠ Unclean HH:MM
+      No reply after check-in         → ⏳ Response Pending since HH:MM
+      Free-form message               → 📝 Message Received HH:MM
+      No event, but touch exists      → Updated HH:MM
     """
     if not latest_event and not last_touch_ts:
         return None
     ts = latest_event.timestamp if latest_event else last_touch_ts
     time_str = ts.strftime("%-I:%M %p").lower() if hasattr(ts, 'strftime') else ""
+
+    # No event data — just a timestamp update
     if not latest_event or not latest_event.full_text:
-        return f"Updated {time_str}" if time_str else None
+        if not time_str:
+            return None
+        return f"Updated {time_str}"
+
     text = latest_event.full_text.strip().lower()
-    if text in ("1", "yes", "done", "complete", "clean", "a"):
+
+    # Onsite confirmation (sub confirmed arrival/readiness)
+    if text in ("1", "yes"):
+        return f"✓ Onsite {time_str}" if time_str else "✓ Onsite"
+
+    # Completion confirmation
+    if text in ("done", "complete", "a"):
         return f"✓ Completed {time_str}" if time_str else "✓ Completed"
+
+    # Cleanliness confirmation
+    if text in ("clean",):
+        return f"✓ Clean {time_str}" if time_str else "✓ Clean"
+
+    # Behind / delayed (with or without verification)
     if text in ("2", "no", "partial"):
         if behind_verified:
             return f"⚠ Behind {time_str}" if time_str else "⚠ Behind"
         else:
-            # Option B: no proactive check-in was sent — soften the label
             return f"⚠ Unconfirmed {time_str}" if time_str else "⚠ Unconfirmed"
+
+    # Issue reported
     if text in ("3",) or text.startswith("issue"):
-        return f"🔴 Issue {time_str}" if time_str else "🔴 Issue"
+        return f"🔴 Issue Reported {time_str}" if time_str else "🔴 Issue Reported"
+
+    # Site unclean
     if text in ("b", "not clean"):
         return f"⚠ Unclean {time_str}" if time_str else "⚠ Unclean"
+
+    # Not ready
     if text.startswith("not ready"):
         return f"🔴 Not ready {time_str}" if time_str else "🔴 Not ready"
-    return f"Reported {time_str}" if time_str else "Reported"
+
+    # Catch-all for free-form messages
+    return f"📝 Message Received {time_str}" if time_str else "📝 Message Received"
 
 
 async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
