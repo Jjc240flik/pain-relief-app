@@ -14,25 +14,7 @@ This keeps the document useful as a living backlog rather than becoming cluttere
 
 ---
 
-## 1. "Last Verified" Activity Indicators
-
-- **Value:** Very High
-- **Effort:** Low–Medium
-- **Recommendation:** Strong candidate to add relatively soon. Directly solves one of Jim's biggest time wasters (driving to houses just to verify attendance).
-
-### Description
-
-Add a small, subtle label next to the time indicator on each dashboard card showing the specific response type — e.g. **"Onsite 7:46 AM"** or **"Response Pending since 7:45 AM"**. This gives Jim at-a-glance confirmation that a sub actually arrived without requiring a site visit or phone call.
-
-Prioritise showing this for subs who have a history of being late or unreliable. The system already tracks `last_touch_ts` per schedule item — the feature would enrich the dashboard display with the nature of the last touch (scheduled arrival, completion check-in, issue report) rather than just the elapsed time.
-
-### Rationale
-
-Jim explicitly said his biggest time waste is *"driving around to see if people got there"*. Even a simple "Verified Onsite" badge would eliminate a large fraction of those unnecessary trips.
-
----
-
-## 2. Immediate Contextual Actions on Issue View
+## 1. Immediate Contextual Actions on Issue View
 
 - **Value:** High
 - **Effort:** Medium
@@ -55,7 +37,7 @@ Jim operates in a high-pressure environment where *"when 5 things go wrong at on
 
 ---
 
-## 3. Auto-Generated Escalation Group Text
+## 2. Auto-Generated Escalation Group Text
 
 - **Value:** Medium
 - **Effort:** Low
@@ -81,87 +63,11 @@ During the interview, Jim described that when multiple issues fire at once, he c
 
 ---
 
-## 4. Delegate Button (Internal Task Assignment)
-
-- **Value:** High
-- **Effort:** Medium
-- **Recommendation:** Add after the core system (SMS loop, Dashboard, Classifier, and media handling) is stable and Jim is actively using the app daily.
-
-### Description
-
-Jim can click a **"Delegate"** button on any Red or Yellow issue card.
-
-This opens a simple interface showing other paid internal team members (Office Admin, Brian/Owner, Foremen, Interior Designer, etc.).
-
-Jim can assign the issue to one or more colleagues and add a short note with instructions.
-
-The assigned person receives a notification (email or in-app) with the house address, issue details, and Jim's note.
-
-The original issue card on Jim's dashboard updates to show:
-- Who the issue was delegated to
-- Jim's note
-- Current delegation status
-
-The assigned person can update the status of the task (e.g. mark as **"In Progress"** or **"Resolved"**) and add comments. These updates should be visible back on the main dashboard.
-
-Jim should **still see the issue** on his dashboard — it does not disappear after delegating.
-
-Jim should be able to **reclaim or re-assign** the task if needed.
-
-All delegation activity and updates are logged in the Events table for audit/history purposes.
-
-This feature is only available to paid internal users, not to external subcontractors.
-
-### Goal
-
-Allow Jim to efficiently distribute work across his team instead of personally handling every issue, while maintaining full visibility and accountability.
-
-### Future Considerations
-
-- Support templates for common delegation notes.
-- Allow recurring delegations or scheduled follow-ups.
-- Add permission levels (e.g. who can delegate vs who can only receive tasks).
-
----
-
-## 5. Internal Metrics & Performance Dashboard (Backend Data Center)
-
-- **Value:** High
-- **Effort:** Medium
-- **Recommendation:** Add after the core system (SMS loop, Dashboard, Classifier, and Call button) is stable and Jim is actively using the app daily. This should not be built during active MVP development.
-
-### Description
-
-Create a protected internal dashboard (accessible only to paid staff / admin users) that shows how the Andon system is performing. The goal is to give Jim visibility into whether the system is actually helping him and where it can be improved — not just what's happening *in the field*, but how well the app itself is working.
-
-Key metrics to track would include:
-
-- **Message performance** — Total SMS sent vs received, response rates per trade, and how often subs engage with the automated check-in messages
-- **Issue volume** — Number of Red and Yellow issues created over time (daily / weekly breakdown)
-- **Resolution speed** — Average time from when an issue is flagged (Red or Yellow) until it is resolved (set back to Green)
-- **Classifier performance** — How often Jim corrects classifications via the feedback endpoint; which keywords or trades produce the most corrections (this directly drives ClassifierEngine improvements)
-- **"Behind" flag accuracy** — How many "Behind" alerts turned out to be real problems vs noise; correlation with Option C history tracking
-- **Top problem areas** — Which trades, subcontractors, or houses are triggering the most issues; surfacing recurring patterns
-- **System health** — Failed SMS deliveries, webhook errors, API response times, or other technical issues
-
-### Future Considerations
-
-- Start simple with a clean internal web page at a dedicated path (e.g. `/admin` or `/metrics`) rather than a full observability platform
-- Over time, add visual charts, date range filters, and CSV export for offline analysis
-- Eventually support multiple internal users with different permission levels
-- Becomes especially valuable once multiple builders are using the system — helps identify patterns across companies, trades, and regions
-
-### Rationale
-
-Right now, there is no way to measure whether the Andon system is actually reducing Jim's workload. The core dashboard tells him what's wrong *right now*, but it doesn't tell him whether issues are resolving faster than before, which subs are most reliable, or whether the classifier is getting better over time. An internal metrics dashboard turns raw event data into actionable insight — making the system self-improving rather than just reactive.
-
----
-
-## 6. Plug-in / Integration Layer (Zapier + Builder Platforms)
+## 3. Plug-in / Integration Layer (Zapier + Builder Platforms)
 
 - **Value:** High
 - **Effort:** Medium–High
-- **Recommendation:** Do not build during active MVP. Add this after the core system (SMS loop, Dashboard, Classifier, and Call button) is stable and Jim is actively using the app daily. This should be treated as a post-MVP capability.
+- **Recommendation:** Do not build during active MVP. Add this after the core system (SMS loop, Dashboard, Classifier, and media handling) is stable and Jim is actively using the app daily. This should be treated as a post-MVP capability.
 
 ### Description
 
@@ -189,69 +95,83 @@ No home builder runs their entire operation inside a single app. They use QuickB
 
 ---
 
-## 7. Usage Monitoring & Alerts (Cost & Performance Tracking)
+# Completed Features
 
-- **Value:** Medium–High
-- **Effort:** Medium
-- **Recommendation:** Add after the core system (SMS loop, Dashboard, Classifier, and media handling) is stable and Jim is actively using the app daily. This becomes more important once multiple builders or higher message volume is involved.
-
-### Description
-
-Create a protected internal section (or page) that allows Jim (and other admin users) to monitor how the system is being used. The goal is to provide visibility into usage patterns and help control costs at scale — especially around Twilio (SMS/MMS/Voice), OpenAI Whisper (transcription), and media storage.
-
-Key metrics to track should include:
-
-- **Message volume** — Total SMS, Email, and Voice messages sent and received over time (daily / weekly / monthly)
-- **Media usage** — Number of photos and videos stored, total storage consumed
-- **Issue velocity** — Number of Red and Yellow issues created per day or week
-- **Classifier accuracy** — How often Jim corrects classifications (correction rate over time)
-- **Resolution speed** — Average time from issue flagged to issue resolved
-
-Add the ability to set simple **usage alerts** — for example, notify Jim when monthly SMS volume exceeds a certain threshold, or when storage consumption grows unusually fast.
-
-All data should be retained until the project is marked as complete.
-
-### Future Considerations
-
-- Add charts and graphs for better visualisation of trends over time
-- Allow filtering by trade, subcontractor, or house
-- Support export of usage reports (CSV or PDF)
-- Eventually allow multiple internal users with different permission levels to view usage data
-- Add more advanced cost forecasting (e.g. projected monthly spend based on current usage patterns)
-
-### Rationale
-
-Right now, there is no way to see whether the system is being used efficiently or whether costs are growing as expected. Twilio charges per SMS segment, per MMS, and per minute of voice — and OpenAI charges per minute of audio transcribed. Without visibility into these numbers, cost overruns only get noticed when the bill arrives. A usage monitoring page gives Jim the data he needs to manage costs proactively rather than reactively.
+Features that have been built and are currently live in the system. Each entry includes the delivery date and a summary of what was shipped.
 
 ---
 
-## 8. Subcontractor Performance Scorecard
+## 1. "Last Verified" Activity Indicators
 
-- **Value:** High
-- **Effort:** Medium
-- **Recommendation:** Add after the core system (SMS loop, Dashboard, Classifier, and media handling) is stable and Jim has been actively using the app for at least 1–2 months. This feature becomes more valuable once there is real usage data.
+- **Completed:** July 18, 2026
+- **Delivered:** Enhanced dashboard card labels showing specific response types — "✓ Onsite 7:46 AM", "⚠ Behind 7:45 AM", "🔴 Issue Reported 9:12 AM", "📝 Message Received 2:31 PM", "⚠ Unconfirmed 3:32 AM". Labels are trade-aware and update in real time as new replies come in. Option B+C logic ensures "Behind" is only shown when a proactive check-in was actually sent.
 
-### Description
+---
 
-Create a simple internal view that shows performance metrics for each subcontractor over time. The goal is to help Jim identify which subcontractors are reliable and which ones consistently cause issues — turning raw event data into actionable vendor intelligence.
+## 2. Delegate Button (Internal Task Assignment)
 
-Key metrics to track should include:
+- **Completed:** July 18, 2026
+- **Delivered:** "👥 Delegate" button on every Red/Yellow dashboard card. Opens a modal with team member checkboxes (Brian, Clint, Office Admin, Interior Designer) and a note field. Issue card updates with delegation badge showing assignee and status. Assigned person can mark as In Progress / Resolved. PM can Reclaim the task. All activity logged in Events table. Database: `delegated_to`, `delegated_by`, `delegation_note`, `delegation_status` columns on `schedule_items`.
 
-- **Issue frequency** — How often a subcontractor triggers Red or Yellow issues
-- **"Behind" rate** — How frequently they are flagged as "Behind"
-- **Classification reliability** — How often Jim corrects their classifications (a signal of unclear or inconsistent reporting)
-- **Response speed** — Average response time to automated check-in messages
-- **Task completion rate** — Number of times work was delegated to them vs how often they completed the assigned task
+---
 
-This scorecard should only be visible to paid internal users — not to external subcontractors. The data should be derived from existing information already logged in the system (Events table, schedule status changes, corrections, etc.).
+## 3. Internal Metrics & Performance Dashboard
 
-### Future Considerations
+- **Completed:** July 18, 2026
+- **Delivered:** Protected admin analytics page at `/admin/analytics` with four sections — Usage Metrics (SMS, MMS, Voice, Email counts + daily trend chart), Cost Estimates (Twilio/Whisper costs + projected monthly), Issue & Classifier Insights (Red/Yellow counts, correction rate, issues by trade, top subcontractors), System Health (schedules, media events). Configurable 7/30/90-day date range filter. All metrics derived from existing `events` table.
 
-- Allow Jim to add private notes on individual subcontractors (e.g. *"Good quality but slow to respond"*)
-- Support filtering by trade, date range, or specific houses
-- Use the scorecard data to automatically adjust "Behind" sensitivity for repeat offenders (feeds into Option C logic)
-- Allow exporting performance reports for quarterly reviews
+---
 
-### Rationale
+## 4. Usage Monitoring & Alerts
 
-Jim currently relies on memory and word-of-mouth to know which subs are reliable. During the interview, he described certain subs as a *"revolving door"* and others as *"great — show up religiously"*. A data-backed scorecard turns this anecdotal knowledge into objective metrics, helping Jim make better decisions about which subs to hire, which to monitor closely, and which to replace.
+- **Completed:** July 18, 2026
+- **Delivered:** Alert configuration page at `/admin/alerts` with toggle switches and threshold inputs for three alert types — Monthly Spend Limit, Daily Message Volume, Media Storage Growth. Active alerts display inline on the analytics page. Config stored in `alerts_config.json`. Alerts evaluate when analytics page loads.
+
+---
+
+## 5. Subcontractor Performance Scorecard
+
+- **Completed:** July 18, 2026
+- **Delivered:** Sortable scorecard table at `/admin/scorecard` with per-subcontractor metrics — Red/Yellow issue count, Behind flags, Classification Corrections, Delegation count and completion rate. Trade filter tabs. Visual highlights for repeat offenders (3+ Red or 3+ Behind). All metrics derived from existing `events`, `schedule_items`, and `contacts` data.
+
+---
+
+## 6. Onboarding Flow + Contact Import
+
+- **Completed:** July 18, 2026
+- **Delivered:** Three-step onboarding wizard at `/onboarding` — Welcome page with overview, CSV upload with downloadable template, manual single-contact form, and post-import success screen with counts. Users can skip and return later via `/admin/contacts`. CSV parser handles duplicate detection (updates existing by phone).
+
+---
+
+## 7. ClassifierEngine v3 + Graded Keyword Import
+
+- **Completed:** July 18, 2026
+- **Delivered:** ClassifierEngine v3 with trade severity matrix (1.3–0.85 multipliers), multi-hit scoring (3+ Yellow keywords upgrade to Red), expanded keyword lists (200+ across 9 categories), and graded keyword integration via `POST /admin/import-keywords`. Graded Excel file (420/420 terms across 10 trades) imported to `keywords_rules.json`. Step 3f checks graded keywords before built-in lists.
+
+---
+
+## 8. Improved Feedback / Correction Experience
+
+- **Completed:** July 18, 2026
+- **Delivered:** Inline correction picker on every dashboard card — click 👎 to reveal Red/Yellow/Green buttons with optional comment field. Corrections update the card in real time and log original status, new status, and comment to Events table. Backend `resolve` endpoint accepts `correct_status` (R/Y/G) and `comment` parameters.
+
+---
+
+## 9. MMS Photo (Up to 5) + Video Support
+
+- **Completed:** July 18, 2026
+- **Delivered:** MMS handler detects up to 5 media items (photos + video) per message. Media downloaded from Twilio and stored to S3 or local fallback. Dashboard shows 📷 N photos badge with count, ▶️ Video button. Gallery modal with Prev/Next navigation and video player modal with browser-native playback. Media metadata stored in Event `raw_payload`.
+
+---
+
+## 10. Email Inbound (SendGrid)
+
+- **Completed:** July 18, 2026
+- **Delivered:** SendGrid Inbound Parse webhook at `/webhooks/sendgrid/inbound`. Receives email → resolves sender by email against contacts → passes through ClassifierEngine → logs as immutable Event with `channel='email'`. Unknown senders logged without classification.
+
+---
+
+## 11. Voice + MMS Inbound
+
+- **Completed:** July 18, 2026
+- **Delivered:** Twilio voice webhook with `<Record>` TwiML for voicemail. Recording callback downloads audio and transcribes via OpenAI Whisper API. Transcription passed through ClassifierEngine. Falls back gracefully without API key. MMS detection added to existing SMS webhook. All events logged with `channel='voice_message'` or media metadata in SMS events.
