@@ -117,3 +117,36 @@ This feature is only available to paid internal users — not to external subcon
 ### Rationale
 
 Jim currently handles nearly every issue personally. During the interview, he described needing to *"divide and conquer"* when multiple things go wrong at once. A Delegate button lets him distribute work across the team without leaving the dashboard — reducing his personal bottleneck and keeping issues moving even when he's stretched thin.
+
+---
+
+## 5. Internal Metrics & Performance Dashboard (Backend Data Center)
+
+- **Value:** High
+- **Effort:** Medium
+- **Recommendation:** Add after the core system (SMS loop, Dashboard, Classifier, and Call button) is stable and Jim is actively using the app daily. This should not be built during active MVP development.
+
+### Description
+
+Create a protected internal dashboard (accessible only to paid staff / admin users) that shows how the Andon system is performing. The goal is to give Jim visibility into whether the system is actually helping him and where it can be improved — not just what's happening *in the field*, but how well the app itself is working.
+
+Key metrics to track would include:
+
+- **Message performance** — Total SMS sent vs received, response rates per trade, and how often subs engage with the automated check-in messages
+- **Issue volume** — Number of Red and Yellow issues created over time (daily / weekly breakdown)
+- **Resolution speed** — Average time from when an issue is flagged (Red or Yellow) until it is resolved (set back to Green)
+- **Classifier performance** — How often Jim corrects classifications via the feedback endpoint; which keywords or trades produce the most corrections (this directly drives ClassifierEngine improvements)
+- **"Behind" flag accuracy** — How many "Behind" alerts turned out to be real problems vs noise; correlation with Option C history tracking
+- **Top problem areas** — Which trades, subcontractors, or houses are triggering the most issues; surfacing recurring patterns
+- **System health** — Failed SMS deliveries, webhook errors, API response times, or other technical issues
+
+### Future Considerations
+
+- Start simple with a clean internal web page at a dedicated path (e.g. `/admin` or `/metrics`) rather than a full observability platform
+- Over time, add visual charts, date range filters, and CSV export for offline analysis
+- Eventually support multiple internal users with different permission levels
+- Becomes especially valuable once multiple builders are using the system — helps identify patterns across companies, trades, and regions
+
+### Rationale
+
+Right now, there is no way to measure whether the Andon system is actually reducing Jim's workload. The core dashboard tells him what's wrong *right now*, but it doesn't tell him whether issues are resolving faster than before, which subs are most reliable, or whether the classifier is getting better over time. An internal metrics dashboard turns raw event data into actionable insight — making the system self-improving rather than just reactive.
