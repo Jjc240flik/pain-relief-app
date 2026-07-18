@@ -222,3 +222,36 @@ All data should be retained until the project is marked as complete.
 ### Rationale
 
 Right now, there is no way to see whether the system is being used efficiently or whether costs are growing as expected. Twilio charges per SMS segment, per MMS, and per minute of voice — and OpenAI charges per minute of audio transcribed. Without visibility into these numbers, cost overruns only get noticed when the bill arrives. A usage monitoring page gives Jim the data he needs to manage costs proactively rather than reactively.
+
+---
+
+## 8. Subcontractor Performance Scorecard
+
+- **Value:** High
+- **Effort:** Medium
+- **Recommendation:** Add after the core system (SMS loop, Dashboard, Classifier, and media handling) is stable and Jim has been actively using the app for at least 1–2 months. This feature becomes more valuable once there is real usage data.
+
+### Description
+
+Create a simple internal view that shows performance metrics for each subcontractor over time. The goal is to help Jim identify which subcontractors are reliable and which ones consistently cause issues — turning raw event data into actionable vendor intelligence.
+
+Key metrics to track should include:
+
+- **Issue frequency** — How often a subcontractor triggers Red or Yellow issues
+- **"Behind" rate** — How frequently they are flagged as "Behind"
+- **Classification reliability** — How often Jim corrects their classifications (a signal of unclear or inconsistent reporting)
+- **Response speed** — Average response time to automated check-in messages
+- **Task completion rate** — Number of times work was delegated to them vs how often they completed the assigned task
+
+This scorecard should only be visible to paid internal users — not to external subcontractors. The data should be derived from existing information already logged in the system (Events table, schedule status changes, corrections, etc.).
+
+### Future Considerations
+
+- Allow Jim to add private notes on individual subcontractors (e.g. *"Good quality but slow to respond"*)
+- Support filtering by trade, date range, or specific houses
+- Use the scorecard data to automatically adjust "Behind" sensitivity for repeat offenders (feeds into Option C logic)
+- Allow exporting performance reports for quarterly reviews
+
+### Rationale
+
+Jim currently relies on memory and word-of-mouth to know which subs are reliable. During the interview, he described certain subs as a *"revolving door"* and others as *"great — show up religiously"*. A data-backed scorecard turns this anecdotal knowledge into objective metrics, helping Jim make better decisions about which subs to hire, which to monitor closely, and which to replace.
