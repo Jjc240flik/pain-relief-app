@@ -9,7 +9,7 @@ class ContactRepository(BaseRepository[Contact]):
         super().__init__(session, Contact)
 
     async def get_by_phone(self, phone: str) -> Contact | None:
-        stmt = select(Contact).where(Contact.phone == phone)
+        stmt = select(Contact).where(Contact.phone == phone, Contact.is_active == True)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
