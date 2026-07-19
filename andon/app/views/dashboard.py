@@ -61,51 +61,68 @@ TRADE_LABELS = {
     "finish_work": "Finish Work",
 }
 
+# Build phase order — matching seed.py
+TRADE_PHASES = [
+    "foundation_concrete", "framing", "plumbing_rough", "hvac_rough",
+    "electrical_rough", "drywall_plaster", "paint", "flooring",
+    "cabinets", "finish_work",
+]
+
 TRADE_NOTES = {
     "foundation_concrete": "Extra midpoint checks active",
     "framing": "Selective escalation active",
 }
 
+
+# ── Cascade push helpers ──
+
+def _get_following_trades(trade: str) -> list[str]:
+    """Return trades that come after the given trade in build order."""
+    try:
+        idx = TRADE_PHASES.index(trade)
+        return TRADE_PHASES[idx + 1:]
+    except ValueError:
+        return []
+
+
+async def _get_following_trade_items(
+    session: AsyncSession, house_id, trade: str,
+) -> list[ScheduleItem]:
+    """Get schedule items for trades that follow the given trade for a house, ordered by phase."""
+    following = _get_following_trades(trade)
+    if not following:
+        return []
+    stmt = (
+        select(ScheduleItem)
+        .where(
+            ScheduleItem.house_id == house_id,
+            ScheduleItem.trade.in_(following),
+        )
+        .order_by(ScheduleItem.scheduled_start)
+    )
+    result = await session.execute(stmt)
+    items = list(result.scalars().all())
+    # Sort by phase order
+    items.sort(key=lambda si: TRADE_PHASES.index(si.trade) if si.trade in TRADE_PHASES else 999)
+    return items
+
+
+def _build_push_updates(item: ScheduleItem, days: int) -> dict:
+    """Build the update dict for pushing a schedule item by N days."""
+    updates = {}
+    if item.scheduled_start:
+        updates["scheduled_start"] = item.scheduled_start + timedelta(days=days)
+    if item.scheduled_end:
+        updates["scheduled_end"] = item.scheduled_end + timedelta(days=days)
+    return updates
+
+
 # ── Contextual quick actions per trade ──
-# Each action: {label, icon, action, href_template or message_template}
 CONTEXTUAL_ACTIONS = {
-    "foundation_concrete": [
-        {"label": "Check Cure Time", "icon": "⏱", "action": "prefill_note", "message": "Check cure time status for {address} — has the concrete reached minimum PSI?"},
-        {"label": "Call Concrete Co.", "icon": "📞", "action": "call_contact"},
-        {"label": "Flag Re-pour", "icon": "🔄", "action": "prefill_note", "message": "Possible re-pour needed at {address} — verify with engineer before proceeding."},
-    ],
     "framing": [
         {"label": "Check Truss Specs", "icon": "📐", "action": "prefill_note", "message": "Verify truss specifications at {address} — check for damage on delivery."},
         {"label": "Call Supplier", "icon": "📞", "action": "call_contact"},
         {"label": "Request Inspection", "icon": "🔍", "action": "prefill_note", "message": "Schedule framing inspection at {address} — ready for review."},
-    ],
-    "plumbing_rough": [
-        {"label": "Check Venting", "icon": "🔧", "action": "prefill_note", "message": "Verify venting is correct at {address} before drywall goes up."},
-        {"label": "Schedule Inspection", "icon": "🔍", "action": "prefill_note", "message": "Plumbing rough-in ready for inspection at {address}."},
-    ],
-    "hvac_rough": [
-        {"label": "Check Ductwork", "icon": "🌀", "action": "prefill_note", "message": "Verify ductwork layout at {address} before drywall enclosure."},
-        {"label": "Schedule Inspection", "icon": "🔍", "action": "prefill_note", "message": "HVAC rough-in ready for inspection at {address}."},
-    ],
-    "electrical_rough": [
-        {"label": "Check Boxes", "icon": "💡", "action": "prefill_note", "message": "Verify all electrical boxes are correctly placed at {address}."},
-        {"label": "Schedule Inspection", "icon": "🔍", "action": "prefill_note", "message": "Electrical rough-in ready for inspection at {address}."},
-    ],
-    "drywall_plaster": [
-        {"label": "Check Moisture", "icon": "💧", "action": "prefill_note", "message": "Check moisture levels at {address} before drywall installation."},
-        {"label": "Flag Delays", "icon": "⏳", "action": "prefill_note", "message": "Drywall crew delayed at {address} — update schedule."},
-    ],
-    "paint": [
-        {"label": "Check Prep Work", "icon": "🎨", "action": "prefill_note", "message": "Verify surface prep complete at {address} before painting starts."},
-        {"label": "Touch-up List", "icon": "📋", "action": "prefill_note", "message": "Compile touch-up items at {address} for final walkthrough."},
-    ],
-    "flooring": [
-        {"label": "Check Subfloor", "icon": "🏗", "action": "prefill_note", "message": "Verify subfloor condition at {address} before flooring installation."},
-        {"label": "Verify Material", "icon": "📦", "action": "prefill_note", "message": "Confirm flooring material has arrived at {address} and is correct."},
-    ],
-    "cabinets": [
-        {"label": "Check Dimensions", "icon": "📏", "action": "prefill_note", "message": "Verify cabinet dimensions at {address} match the plans."},
-        {"label": "Verify Hardware", "icon": "🔩", "action": "prefill_note", "message": "Confirm all cabinet hardware has arrived at {address}."},
     ],
     "finish_work": [
         {"label": "Review Punch List", "icon": "📝", "action": "prefill_note", "message": "Review final punch list items at {address} before sign-off."},
@@ -436,6 +453,8 @@ async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
             "delegation_status": item.delegation_status or "",
             # ── Contextual quick actions based on trade + message ──
             "contextual_actions": _get_contextual_actions(item.trade, latest_event.full_text if latest_event else None),
+            # ── Following trades for cascade push (same house, later phases) ──
+            "following_trades": _get_following_trades(item.trade),
             # ── Media attachments from ALL recent events (MMS photos/video) ──
             "media_info": all_media,
             "photo_count": sum(1 for m in all_media if m.get("category") == "photo"),
@@ -687,26 +706,48 @@ async def push_item(
     request: Request,
     item_id: UUID,
     days: int = Query(1),
+    cascade: str = Query("none"),
+    selected_trades: str = Query(""),
     session: AsyncSession = Depends(get_db),
 ):
-    """Push schedule dates by N days, log event, return updated row list."""
+    """Push schedule dates by N days, with optional cascade to following trades.
+
+    cascade:
+      - "none"     — only this trade (default)
+      - "next"     — this trade + the next scheduled trade on the same house
+      - "selected" — this trade + trades listed in selected_trades
+    """
     repo = ScheduleRepository(session)
     item = await repo.get(item_id)
     if not item:
         return HTMLResponse("", status_code=404)
 
-    updates = {}
-    if item.scheduled_start:
-        updates["scheduled_start"] = item.scheduled_start + timedelta(days=days)
-    if item.scheduled_end:
-        updates["scheduled_end"] = item.scheduled_end + timedelta(days=days)
-
+    # Push the current trade
+    updates = _build_push_updates(item, days)
     if updates:
         await repo.update(item_id, **updates)
-
     await _log_action(session, item_id, f"Push +{days} day(s)")
-    await session.commit()
 
+    # Cascade helpers
+    async def _push_trade(trade_name: str) -> None:
+        sibling = await repo.get_by_trade_and_house(item.house_id, trade_name)
+        if sibling and sibling.id != item_id:
+            su = _build_push_updates(sibling, days)
+            if su:
+                await repo.update(sibling.id, **su)
+            await _log_action(session, sibling.id, f"Cascade push +{days} day(s) from {item.trade}")
+
+    if cascade == "next":
+        following_trades = _get_following_trades(item.trade)
+        if following_trades:
+            await _push_trade(following_trades[0])
+
+    elif cascade == "selected" and selected_trades:
+        targets = [t.strip() for t in selected_trades.split(",") if t.strip()]
+        for t in targets:
+            await _push_trade(t)
+
+    await session.commit()
     html = await _render_rows(session)
     return HTMLResponse(html)
 
@@ -716,9 +757,15 @@ async def push_custom_item(
     request: Request,
     item_id: UUID,
     new_start_date: str = Form(...),
+    cascade: str = Form("none"),
+    selected_trades: str = Form(""),
     session: AsyncSession = Depends(get_db),
 ):
-    """Push schedule to a specific date, log event, return updated row list."""
+    """Push schedule to a specific date, log event, return updated row list.
+
+    cascade: "none" | "next" | "all" | "selected"
+    When cascade is used, the same date shift is applied to following trades.
+    """
     repo = ScheduleRepository(session)
     item = await repo.get(item_id)
     if not item:
@@ -737,21 +784,31 @@ async def push_custom_item(
 
         await repo.update(item_id, **updates)
         await _log_action(session, item_id, f"Custom date push", f"New start: {parsed}")
+
+        # Cascade to following trades
+        if days_diff != 0:
+            async def _push_cascade_trade(trade_name: str) -> None:
+                sibling = await repo.get_by_trade_and_house(item.house_id, trade_name)
+                if sibling and sibling.id != item_id:
+                    su = _build_push_updates(sibling, days_diff)
+                    if su:
+                        await repo.update(sibling.id, **su)
+                    await _log_action(session, sibling.id, f"Cascade push +{days_diff} day(s) from {item.trade} (custom date)")
+
+            if cascade == "next":
+                following_trades = _get_following_trades(item.trade)
+                if following_trades:
+                    await _push_cascade_trade(following_trades[0])
+            elif cascade == "all":
+                following_trades = _get_following_trades(item.trade)
+                for trade_name in following_trades:
+                    await _push_cascade_trade(trade_name)
+            elif cascade == "selected" and selected_trades:
+                targets = [t.strip() for t in selected_trades.split(",") if t.strip()]
+                for t in targets:
+                    await _push_cascade_trade(t)
+
         await session.commit()
-
-    html = await _render_rows(session)
-    return HTMLResponse(html)
-
-
-@router.post("/dashboard/{item_id}/escalate")
-async def escalate_item(
-    request: Request,
-    item_id: UUID,
-    session: AsyncSession = Depends(get_db),
-):
-    """Escalate to owner — log a specific event, no status change."""
-    await _log_action(session, item_id, "Escalated to owner")
-    await session.commit()
 
     html = await _render_rows(session)
     return HTMLResponse(html)

@@ -85,15 +85,9 @@
               hx-target="#house-list" hx-swap="outerHTML"
               class="px-3 py-1.5 text-xs font-medium rounded-lg transition
                      bg-blue-50 text-blue-700 hover:bg-blue-100">
-        +1 Day
+        +
       </button>
-      <button hx-post="/dashboard/{{ item.id }}/push?days=3"
-              hx-target="#house-list" hx-swap="outerHTML"
-              class="px-3 py-1.5 text-xs font-medium rounded-lg transition
-                     bg-blue-50 text-blue-700 hover:bg-blue-100">
-        +3 Days
-      </button>
-      <button onclick="openDatePicker('{{ item.id }}')"
+      <button onclick="openDatePicker('{{ item.id }}', '{{ item.trade_display | e }}', '{{ item.following_trades | join(',') }}')"
               class="px-3 py-1.5 text-xs font-medium rounded-lg transition
                      bg-gray-50 text-gray-600 hover:bg-gray-100">
         📅 Date
@@ -164,12 +158,6 @@
         </div>
       </div>
       {% endif %}
-      <button hx-post="/dashboard/{{ item.id }}/escalate"
-              hx-target="#house-list" hx-swap="outerHTML"
-              class="px-3 py-1.5 text-xs font-medium rounded-lg transition
-                     bg-orange-50 text-orange-700 hover:bg-orange-100">
-        ⬆ Escalate
-      </button>
       <!-- Delegate button -->
       <button onclick="openDelegateModal('{{ item.id }}')"
               class="px-3 py-1.5 text-xs font-medium rounded-lg transition
@@ -211,13 +199,6 @@
               class="px-2 py-1 text-[10px] font-medium rounded-lg transition
                      bg-green-50 text-green-700 hover:bg-green-100">
         ✓ Resolved
-      </button>
-      <button hx-post="/dashboard/{{ item.id }}/delegation-update"
-              hx-vals='{"new_status":"reclaimed"}'
-              hx-target="#house-list" hx-swap="outerHTML"
-              class="px-2 py-1 text-[10px] font-medium rounded-lg transition
-                     bg-gray-50 text-gray-600 hover:bg-gray-100">
-        ↩ Reclaim
       </button>
       {% endif %}
     </div>
