@@ -23,6 +23,7 @@ from app.api.schedule import router as schedule_router
 from app.api.admin import router as admin_router
 from app.views.dashboard import router as dashboard_router
 from app.views.onboarding import router as onboarding_router
+from app.api.auth import router as auth_router
 from app.services.scheduler import SchedulerService
 
 # ---------------------------------------------------------------------------
@@ -83,6 +84,7 @@ app.include_router(dashboard_router) # /dashboard + HTMX actions
 app.include_router(twilio_router)    # /webhooks/twilio/*
 app.include_router(sendgrid_router)  # /webhooks/sendgrid/*
 app.include_router(onboarding_router) # /onboarding/*
+app.include_router(auth_router)       # /auth/*
 app.include_router(admin_router)     # /admin/*
 
 # Serve locally stored media files (photos, videos)

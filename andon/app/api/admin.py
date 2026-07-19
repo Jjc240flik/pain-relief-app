@@ -22,13 +22,14 @@ from app.database import async_session, get_db
 from app.models.event import Event
 from app.models.schedule_item import ScheduleItem
 from app.repositories.base import BaseRepository
+from app.services.auth import require_admin, require_owner
 from app.services.keyword_loader import load_keywords_from_excel, format_report
 from app.services.classifier import load_graded_rules
 from app.views.dashboard import _render  # Reuse Jinja2 rendering
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 # Expected location of the graded Excel file
 EXCEL_PATH = Path(__file__).parent.parent.parent / "keywords_and_phrases_checklist.xlsx"

@@ -23,10 +23,11 @@ from app.models.event import Event
 from app.models.contact import Contact
 from app.repositories.schedule_repo import ScheduleRepository
 from app.repositories.base import BaseRepository
+from app.services.auth import require_admin, optional_user
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="", tags=["dashboard"])
+router = APIRouter(prefix="", tags=["dashboard"], dependencies=[Depends(require_admin)])
 
 # ---------------------------------------------------------------------------
 # Jinja2 environment (manual setup — avoids starlette wrapper compatibility)
@@ -605,7 +606,11 @@ async def _render_rows(session: AsyncSession) -> str:
     return _render("partials/house_rows.html", items=items)
 
 @router.get("/dashboard", response_class=HTMLResponse)
-async def dashboard_page(request: Request, session: AsyncSession = Depends(get_db)):
+async def dashboard_page(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    user: dict = Depends(require_admin),
+):
     """Render the full dashboard page."""
     items = await _get_red_yellow_items(session)
     today = date.today().strftime("%B %d, %Y")
@@ -620,12 +625,17 @@ async def dashboard_page(request: Request, session: AsyncSession = Depends(get_d
         red_count=red_count,
         yellow_count=yellow_count,
         escalations=escalations,
+        user=user,
     )
     return HTMLResponse(html)
 
 
 @router.get("/dashboard/partial", response_class=HTMLResponse)
-async def dashboard_partial(request: Request, session: AsyncSession = Depends(get_db)):
+async def dashboard_partial(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    user: dict = Depends(require_admin),
+):
     """HTMX partial — returns only the house_rows partial + escalation banners."""
     items = await _get_red_yellow_items(session)
     rows_html = await _render_rows(session)
