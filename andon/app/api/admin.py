@@ -353,8 +353,8 @@ async def subcontractor_scorecard(
                 "name": c.name or identifier,
                 "company": c.company or "",
                 "phone": c.phone or "",
-                "trade": trade,
-                "trade_display": TRADE_LABELS.get(trade, trade.replace("_", " ").title()),
+                "trade": contact_trade,
+                "trade_display": TRADE_LABELS.get(contact_trade, contact_trade.replace("_", " ").title()),
                 "red": red,
                 "yellow": yellow,
                 "behind": behind,
@@ -375,7 +375,7 @@ async def subcontractor_scorecard(
         request=request,
         subs=scorecard,
         sort=sort,
-        trade_filter=trade_filter,
+        trade_filter=trade,
         trades=TRADE_LABELS,
     )
     return HTMLResponse(html)
