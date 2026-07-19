@@ -113,6 +113,23 @@ async def upload_keywords(request: Request, user: dict = Depends(require_owner))
         os.unlink(tmp.name)
 
 
+@router.get("/escalations", response_class=HTMLResponse)
+async def escalation_history(request: Request, user: dict = Depends(require_owner)):
+    """Show escalation history from the database."""
+    from sqlalchemy import text as sql_text
+
+    async with async_session() as session:
+        result = await session.execute(sql_text(
+            "SELECT id, house_address, trade, reason, message, status, "
+            "to_char(created_at, 'Mon DD, YYYY HH24:MI') as created "
+            "FROM escalations ORDER BY created_at DESC LIMIT 50"
+        ))
+        rows = result.fetchall()
+
+    html = _render("admin/escalations.html", request=request, escalations=rows)
+    return HTMLResponse(html)
+
+
 # ── Pricing rates for cost estimation ──
 DEFAULT_RATES = {
     "sms_per_segment": 0.0079,

@@ -7,7 +7,7 @@ import json
 import logging
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import jinja2
 from fastapi import APIRouter, Depends, Form, Query, Request
@@ -841,7 +841,43 @@ async def send_escalation(
     message: str = Form(""),
     session: AsyncSession = Depends(get_db),
 ):
-    """Log and send an escalation message. For MVP, logs to Events table."""
+    """Log and persist an escalation. Saves to both Events table and escalations table."""
+    from sqlalchemy import text as sql_text
+    from app.models.event import Event
+    from sqlalchemy.orm import selectinload
+
+    # Find the schedule item for address/trade context (eagerly load house)
+    stmt = select(ScheduleItem).options(selectinload(ScheduleItem.house)).where(ScheduleItem.id == item_id)
+    result = await session.execute(stmt)
+    item = result.scalar_one_or_none()
+    address = item.house.address if item and item.house else "Unknown"
+    trade_display = TRADE_LABELS.get(item.trade, item.trade) if item else "Unknown"
+
+    # Parse the escalation message for structured fields
+    reason = "Manual escalation"
+    group_name = "Project Manager"
+    members = ""
+    for line in message.split("\n"):
+        if "ESCALATION:" in line:
+            reason = line.strip()[:200]
+
+    # Insert into escalations table
+    esc_id = uuid4()
+    await session.execute(sql_text(
+        "INSERT INTO escalations (id, schedule_item_id, house_address, trade, reason, message, group_name, members, status, created_at) "
+        "VALUES (:id, :sid, :addr, :trade, :reason, :msg, :group, :members, 'sent', NOW())"
+    ), {
+        "id": esc_id,
+        "sid": item_id,
+        "addr": address,
+        "trade": trade_display,
+        "reason": reason,
+        "msg": message[:500],
+        "group": group_name,
+        "members": members,
+    })
+
+    # Also log via existing mechanism
     await _log_action(session, item_id, f"Escalation sent: {message[:200]}", "Escalation")
     await session.commit()
 

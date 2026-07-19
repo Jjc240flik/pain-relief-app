@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Admin — Escalation History{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-6">
+
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">🚨 Escalation History</h1>
+      <p class="text-sm text-gray-500">Past escalation events — persists across restarts</p>
+    </div>
+    <a href="/admin/analytics" class="text-sm text-blue-600 hover:text-blue-800">← Back to Analytics</a>
+  </div>
+
+  {% if not escalations %}
+  <div class="text-center py-12 text-gray-400">
+    <p class="text-lg mb-2">No escalations yet</p>
+    <p class="text-sm">Escalations will appear here when you send them from the dashboard.</p>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <th class="text-left px-4 py-3 font-medium">Date</th>
+            <th class="text-left px-4 py-3 font-medium">Address</th>
+            <th class="text-left px-4 py-3 font-medium">Trade</th>
+            <th class="text-left px-4 py-3 font-medium">Reason</th>
+            <th class="text-left px-4 py-3 font-medium">Message</th>
+            <th class="text-center px-4 py-3 font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for esc in escalations %}
+          <tr class="hover:bg-gray-50 transition">
+            <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{{ esc.created }}</td>
+            <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{{ esc.house_address }}</td>
+            <td class="px-4 py-3"><span class="px-2 py-0.5 bg-red-50 text-red-700 rounded text-xs">{{ esc.trade }}</span></td>
+            <td class="px-4 py-3 text-gray-600 max-w-xs truncate">{{ esc.reason }}</td>
+            <td class="px-4 py-3 text-gray-500 text-xs max-w-sm truncate">{{ esc.message[:120] }}</td>
+            <td class="px-4 py-3 text-center">
+              <span class="px-2 py-0.5 rounded text-xs font-medium
+                {% if esc.status == 'sent' %}bg-blue-50 text-blue-700
+                {% elif esc.status == 'acknowledged' %}bg-green-50 text-green-700
+                {% else %}bg-gray-50 text-gray-600{% endif %}">
+                {{ esc.status }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
