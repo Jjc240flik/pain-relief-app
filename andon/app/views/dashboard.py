@@ -3,6 +3,7 @@ Dashboard routes — Daily Red/Yellow view with HTMX actions.
 Uses raw Jinja2 directly (not starlette's Jinja2Templates wrapper) for reliability.
 """
 
+import json
 import logging
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -154,9 +155,6 @@ DEFAULT_ESCALATION_GROUPS = {
         "trigger_keywords": [],
     },
 }
-
-import json
-from pathlib import Path
 
 ESCALATION_CONFIG_FILE = Path(__file__).parent.parent / "escalation_config.json"
 
@@ -628,9 +626,18 @@ async def dashboard_page(request: Request, session: AsyncSession = Depends(get_d
 
 @router.get("/dashboard/partial", response_class=HTMLResponse)
 async def dashboard_partial(request: Request, session: AsyncSession = Depends(get_db)):
-    """HTMX partial — returns only the house_rows partial."""
-    html = await _render_rows(session)
-    return HTMLResponse(html)
+    """HTMX partial — returns only the house_rows partial + escalation banners."""
+    items = await _get_red_yellow_items(session)
+    rows_html = await _render_rows(session)
+    escalations = _check_escalations(items)
+
+    # Render escalation banner partial
+    esc_html = ""
+    if escalations:
+        esc_html = _render("partials/escalation_banners.html", escalations=escalations)
+
+    combined = esc_html + rows_html
+    return HTMLResponse(combined)
 
 
 @router.post("/dashboard/{item_id}/resolve")
@@ -815,6 +822,22 @@ async def update_delegation_status(
 
     html = await _render_rows(session)
     return HTMLResponse(html)
+
+
+@router.post("/dashboard/{item_id}/send-escalation")
+async def send_escalation(
+    request: Request,
+    item_id: UUID,
+    message: str = Form(""),
+    session: AsyncSession = Depends(get_db),
+):
+    """Log and send an escalation message. For MVP, logs to Events table."""
+    await _log_action(session, item_id, f"Escalation sent: {message[:200]}", "Escalation")
+    await session.commit()
+
+    html = await _render_rows(session)
+    return HTMLResponse(html)
+
 
 @router.post("/dashboard/classify/{event_id}/correct")
 async def correct_classification(
