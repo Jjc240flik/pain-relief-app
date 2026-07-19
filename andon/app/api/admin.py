@@ -36,7 +36,7 @@ EXCEL_PATH = Path(__file__).parent.parent.parent / "keywords_and_phrases_checkli
 
 
 @router.post("/import-keywords")
-async def import_keywords() -> Response:
+async def import_keywords(user: dict = Depends(require_owner)) -> Response:
     """
     Read the graded Excel checklist and update the ClassifierEngine rules.
 
@@ -74,6 +74,45 @@ async def import_keywords() -> Response:
     return Response(content=report, media_type="text/plain")
 
 
+@router.get("/keywords", response_class=HTMLResponse)
+async def keywords_page(request: Request, user: dict = Depends(require_owner)):
+    """Render the keyword import page with upload form."""
+    html = _render("admin/keywords.html", request=request, result=None)
+    return HTMLResponse(html)
+
+
+@router.post("/upload-keywords")
+async def upload_keywords(request: Request, user: dict = Depends(require_owner)):
+    """Accept uploaded Excel file, validate, import, and show results."""
+    form = await request.form()
+    file = form.get("file")
+    if not file:
+        html = _render("admin/keywords.html", request=request, result=None, error="Please select a file.")
+        return HTMLResponse(html)
+
+    # Save to temp location
+    import tempfile
+    import os
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    try:
+        content = await file.read()
+        tmp.write(content)
+        tmp.close()
+
+        result = load_keywords_from_excel(tmp.name)
+        load_graded_rules()
+        report = format_report(result)
+
+        html = _render("admin/keywords.html", request=request, result=result, report=report)
+        return HTMLResponse(html)
+    except Exception as exc:
+        logger.error("Keyword import failed: %s", exc)
+        html = _render("admin/keywords.html", request=request, result=None, error=str(exc))
+        return HTMLResponse(html)
+    finally:
+        os.unlink(tmp.name)
+
+
 # ── Pricing rates for cost estimation ──
 DEFAULT_RATES = {
     "sms_per_segment": 0.0079,
@@ -87,7 +126,8 @@ DEFAULT_RATES = {
 @router.get("/analytics", response_class=HTMLResponse)
 async def admin_analytics(
     request: Request,
-    days: int = Query(30, alias="days"),
+    days: int = Query(30, alias="days", ge=1, le=365),
+    user: dict = Depends(require_owner),
 ):
     """Render the admin analytics dashboard with usage, cost, and health metrics."""
     now = datetime.now(timezone.utc)
@@ -217,27 +257,27 @@ TRADE_LABELS = {
 @router.get("/scorecard", response_class=HTMLResponse)
 async def subcontractor_scorecard(
     request: Request,
+    trade: str = Query("", alias="trade"),
     sort: str = Query("red_desc", alias="sort"),
-    trade_filter: str = Query("", alias="trade"),
+    user: dict = Depends(require_owner),
 ):
     """Render the subcontractor performance scorecard."""
     from app.models.contact import Contact
 
     async with async_session() as session:
-        # Get all active contacts
-        contact_stmt = select(Contact).where(Contact.is_active == True)
-        contact_result = await session.execute(contact_stmt)
-        contacts = contact_result.scalars().all()
+        stmt = select(Contact).where(Contact.is_active == True)
+        result = await session.execute(stmt)
+        contacts = result.scalars().all()
 
         scorecard = []
         for c in contacts:
             if not c.phone and not c.email:
                 continue
             identifier = c.phone or c.email
-            trade = c.trade or ""
+            contact_trade = c.trade or ""
 
             # Filter by trade
-            if trade_filter and trade != trade_filter:
+            if trade and contact_trade != trade:
                 continue
 
             # Count Red events
@@ -512,7 +552,7 @@ def _check_alerts(cfg: dict, usage: dict, costs: dict, health: dict) -> list[dic
 
 
 @router.get("/alerts", response_class=HTMLResponse)
-async def alerts_page(request: Request):
+async def alerts_page(request: Request, user: dict = Depends(require_owner)):
     cfg = _load_alerts()
     html = _render("admin/alerts.html", request=request, cfg=cfg, saved=request.query_params.get("saved", ""))
     return HTMLResponse(html)
