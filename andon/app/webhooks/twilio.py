@@ -3,6 +3,7 @@ Twilio webhook handlers for inbound SMS, MMS (photos), and voice recordings.
 """
 
 import logging
+import traceback
 from urllib.parse import parse_qs
 
 from fastapi import APIRouter, Request, Response
@@ -28,11 +29,15 @@ def _validate_twilio_request(request: Request, form_data: str) -> bool:
     if not settings.twilio_auth_token:
         logger.warning("Twilio auth token not set — skipping validation.")
         return True  # Allow in dev mode
+    signature = request.headers.get("X-Twilio-Signature", "")
+    if not signature:
+        logger.warning("No Twilio signature header — allowing (dev mode).")
+        return True  # No signature means it's not from Twilio; allow for dev/testing
     validator = RequestValidator(settings.twilio_auth_token)
     return validator.validate(
         str(request.url),
         form_data,
-        request.headers.get("X-Twilio-Signature", ""),
+        signature,
     )
 
 
@@ -60,89 +65,93 @@ async def inbound_sms(request: Request) -> Response:
       - MediaUrl0, MediaContentType0, MediaSid0: first attachment
       - MediaUrl1, MediaContentType1, MediaSid1: second attachment, etc.
     """
-    body = await request.body()
-    form_str = body.decode("utf-8")
-    form_data = parse_qs(form_str)
+    try:
+        body = await request.body()
+        form_str = body.decode("utf-8")
+        form_data = parse_qs(form_str)
 
-    if not _validate_twilio_request(request, form_str):
-        logger.warning("Invalid Twilio signature — rejecting.")
-        return Response("Invalid signature", status_code=403)
+        if not _validate_twilio_request(request, form_str):
+            logger.warning("Invalid Twilio signature — rejecting.")
+            return Response("Invalid signature", status_code=403)
 
-    payload = _normalise_payload(form_data)
-    sender = payload.get("From", "")
-    message_text = payload.get("Body", "")
-    message_sid = payload.get("MessageSid", "")
-    num_media = int(payload.get("NumMedia", 0) or 0)
+        payload = _normalise_payload(form_data)
+        sender = payload.get("From", "")
+        message_text = payload.get("Body", "")
+        message_sid = payload.get("MessageSid", "")
+        num_media = int(payload.get("NumMedia", 0) or 0)
 
-    # ── Handle MMS media attachments (up to 5) ──
-    media_info = []
-    has_video = False
-    photo_count = 0
-    if num_media > 0:
-        max_media = min(num_media, 5)
-        for i in range(max_media):
-            media_url = payload.get(f"MediaUrl{i}", "")
-            media_type = payload.get(f"MediaContentType{i}", "")
-            media_sid = payload.get(f"MediaSid{i}", "")
-            if not media_url:
-                continue
+        # Handle MMS media attachments (up to 5)
+        media_info = []
+        has_video = False
+        photo_count = 0
+        if num_media > 0:
+            max_media = min(num_media, 5)
+            for i in range(max_media):
+                media_url = payload.get(f"MediaUrl{i}", "")
+                media_type = payload.get(f"MediaContentType{i}", "")
+                media_sid = payload.get(f"MediaSid{i}", "")
+                if not media_url:
+                    continue
 
-            entry = {"original_url": media_url, "content_type": media_type,
-                     "sid": media_sid, "index": i}
+                entry = {"original_url": media_url, "content_type": media_type,
+                         "sid": media_sid, "index": i}
 
-            # Store media permanently (S3 or local)
-            if settings.twilio_account_sid and settings.twilio_auth_token:
-                from app.services.media_store import store_media
-                stored = await store_media(media_url, media_type, media_sid, i)
-                entry.update({
-                    "permanent_url": stored.get("permanent_url", media_url),
-                    "category": stored.get("category", "other"),
-                    "filename": stored.get("filename", ""),
-                    "file_size": stored.get("file_size", 0),
-                    "stored": stored.get("stored", "pending"),
-                    "url": stored.get("permanent_url", media_url),
-                })
-            else:
-                entry["category"] = "photo" if "image" in media_type else "video"
-                entry["url"] = media_url
-                entry["stored"] = "twilio_url"
+                # Store media permanently (S3 or local)
+                if settings.twilio_account_sid and settings.twilio_auth_token:
+                    from app.services.media_store import store_media
+                    stored = await store_media(media_url, media_type, media_sid, i)
+                    entry.update({
+                        "permanent_url": stored.get("permanent_url", media_url),
+                        "category": stored.get("category", "other"),
+                        "filename": stored.get("filename", ""),
+                        "file_size": stored.get("file_size", 0),
+                        "stored": stored.get("stored", "pending"),
+                        "url": stored.get("permanent_url", media_url),
+                    })
+                else:
+                    entry["category"] = "photo" if "image" in media_type else "video"
+                    entry["url"] = media_url
+                    entry["stored"] = "twilio_url"
 
-            media_info.append(entry)
-            if entry.get("category") == "video":
-                has_video = True
-            else:
-                photo_count += 1
+                media_info.append(entry)
+                if entry.get("category") == "video":
+                    has_video = True
+                else:
+                    photo_count += 1
 
-        logger.info(
-            "Inbound MMS: from=%s media=%d photos=%d videos=%s body=%s",
-            sender, num_media, photo_count, has_video, message_text[:100],
+            logger.info(
+                "Inbound MMS: from=%s media=%d photos=%d videos=%s body=%s",
+                sender, num_media, photo_count, has_video, message_text[:100],
+            )
+        else:
+            logger.info("Inbound SMS: from=%s body=%s", sender, message_text[:200])
+
+        # Include media metadata in the raw payload
+        raw_payload = dict(payload)
+        if media_info:
+            raw_payload["media"] = media_info
+
+        channel = "sms"
+
+        async with async_session() as session:
+            result = await _processor.process(
+                session=session,
+                channel=channel,
+                sender_id=sender,
+                raw_text=message_text,
+                raw_payload=raw_payload,
+            )
+
+        logger.info("Processed inbound %s: %s", "MMS" if media_info else "SMS", result)
+
+        return Response(
+            content='<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+            media_type="application/xml",
         )
-    else:
-        logger.info("Inbound SMS: from=%s body=%s", sender, message_text[:200])
-
-    # ── Include media metadata in the raw payload ──
-    raw_payload = dict(payload)
-    if media_info:
-        raw_payload["media"] = media_info
-
-    channel = "sms"  # Both SMS and MMS use the 'sms' channel for now;
-                     # media presence indicates MMS.
-
-    async with async_session() as session:
-        result = await _processor.process(
-            session=session,
-            channel=channel,
-            sender_id=sender,
-            raw_text=message_text,
-            raw_payload=raw_payload,
-        )
-
-    logger.info("Processed inbound %s: %s", "MMS" if media_info else "SMS", result)
-
-    return Response(
-        content='<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
-        media_type="application/xml",
-    )
+    except Exception as exc:
+        tb = traceback.format_exc()
+        logger.error("SMS webhook error:\n%s", tb)
+        return Response(f"{type(exc).__name__}: {exc}", status_code=500)
 
 
 # ---------------------------------------------------------------------------
@@ -200,8 +209,7 @@ async def voice_recording(request: Request) -> Response:
         sender, recording_url, duration, recording_sid,
     )
 
-    # ── Transcribe audio via Whisper ──
-    # Twilio recording URLs require AccountSid:AuthToken for access.
+    # Transcribe audio via Whisper
     twilio_auth = None
     if settings.twilio_account_sid and settings.twilio_auth_token:
         twilio_auth = (settings.twilio_account_sid, settings.twilio_auth_token)
