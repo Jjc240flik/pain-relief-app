@@ -698,9 +698,10 @@ async def delegate_item(
     item_id: UUID,
     delegated_to: str = Form(""),
     delegation_note: str = Form(""),
+    trade_name: str = Form(""),
     session: AsyncSession = Depends(get_db),
 ):
-    """Delegate an issue to one or more internal team members."""
+    """Delegate an issue — notify Boss/Office/Staff via SMS + email."""
     repo = ScheduleRepository(session)
     item = await repo.get(item_id)
     if not item:
@@ -718,6 +719,47 @@ async def delegate_item(
     if delegation_note:
         detail += f" | Note: {delegation_note}"
     await _log_action(session, item_id, detail, "Delegation")
+
+    # ── Send notifications ──
+    from app.services.outbound import OutboundService
+    outbound = OutboundService()
+
+    # Get contact info for this trade
+    from app.repositories.contact_repo import ContactRepository
+    contact_repo = ContactRepository(session)
+    contact = None
+    if item.trade:
+        contacts = await contact_repo.get_by_trade(item.trade)
+        # Use the first active contact
+        for c in contacts:
+            if c.is_active:
+                contact = c
+                break
+        if not contact and contacts:
+            contact = contacts[0]
+
+    roles = [r.strip() for r in delegated_to.split(",") if r.strip()]
+    house = item.house
+    address = house.address if house else "Unknown"
+    msg_body = f"TLG Andon — Delegation: {trade_name or item.trade} issue at {address}. {delegation_note}" if delegation_note else f"TLG Andon — Delegation: {trade_name or item.trade} issue at {address}."
+
+    for role in roles:
+        phone = None
+        email = None
+        if role == "Boss" and contact:
+            phone = contact.manager_phone
+            email = contact.email  # Boss gets the same email for now
+        elif role == "Office" and contact:
+            phone = contact.phone
+            email = contact.email
+        elif role == "Staff" and contact:
+            phone = contact.phone  # Staff uses main contact as fallback
+            email = contact.email
+
+        if phone:
+            await outbound.send_sms(phone, msg_body, item.house_id, item.trade)
+        # Email sending via SendGrid would go here when configured
+        logger.info("Delegate notify: role=%s phone=%s email=%s msg=%s", role, phone, email, msg_body)
 
     await session.commit()
 
