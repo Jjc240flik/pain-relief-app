@@ -225,20 +225,24 @@ def _check_escalations(items: list[dict]) -> list[dict]:
                         "item_id": item["id"],
                     })
 
-        # Check for multiple Red issues on same house
-        for house_id, house_items in by_house.items():
-            red_items = [i for i in house_items if i["andon_status"] == "R"]
-            if len(red_items) >= trigger_multi:
-                addr = red_items[0]["address"]
-                trades = ", ".join(i["trade_display"] for i in red_items)
+        # Check each Red item individually (one escalation per issue, no grouping)
+        for item in items:
+            if item["andon_status"] != "R":
+                continue
+            addr = item["address"]
+            trade = item["trade_display"]
+            item_id = item["id"]
+            # Check if this specific item already has a time-based escalation
+            already_has = any(e.get("item_id") == item_id for e in escalations)
+            if not already_has:
                 escalations.append({
                     "group": group_name,
                     "members": ", ".join(members),
-                    "reason": f"{len(red_items)} Red issues on same house",
-                    "message": f"🚨 ESCALATION: {addr} has {len(red_items)} active Red issues ({trades}). Requires immediate attention.",
+                    "reason": f"Red issue: {trade} at {addr}",
+                    "message": f"🚨 ESCALATION: {addr} — {trade} issue requires immediate attention.",
                     "address": addr,
-                    "trade": trades,
-                    "item_id": red_items[0]["id"],
+                    "trade": trade,
+                    "item_id": item_id,
                 })
 
         # Check for keyword-based escalations
@@ -257,12 +261,12 @@ def _check_escalations(items: list[dict]) -> list[dict]:
                             "item_id": item["id"],
                         })
 
-    # Deduplicate by message content
+    # Deduplicate by item_id (each Red issue gets its own banner, no collapsing)
     seen = set()
     unique = []
     for e in escalations:
-        if e["message"] not in seen:
-            seen.add(e["message"])
+        if e.get("item_id") not in seen:
+            seen.add(e.get("item_id"))
             unique.append(e)
 
     return unique[:5]  # Max 5 escalation banners at once
