@@ -516,12 +516,19 @@ async def dashboard_page(
     red_count = sum(1 for i in items if i["andon_status"] == "R")
     yellow_count = sum(1 for i in items if i["andon_status"] == "Y")
 
+    # Get company name
+    from sqlalchemy import text as sql_text
+    result = await session.execute(sql_text("SELECT value FROM tenant_settings WHERE key = 'company_name'"))
+    row = result.fetchone()
+    company_name = row[0] if row else "TLG Andon"
+
     html = _render(
         "dashboard.html",
         items=items,
         today=today,
         red_count=red_count,
         yellow_count=yellow_count,
+        company_name=company_name,
         user=user,
     )
     return HTMLResponse(html)

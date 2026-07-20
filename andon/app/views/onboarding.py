@@ -2,31 +2,40 @@
 Onboarding routes — new client setup wizard.
 
 Guides new users through:
-  1. Welcome / introduction
-  2. CSV/Excel contact import with template download
-  3. Manual contact entry (one by one)
-  4. Post-import confirmation
+  1. Welcome / company info
+  2. Add houses (projects)
+  3. Import or add contacts (subcontractors)
+  4. Post-setup confirmation
 
 Accessible at /onboarding.
-If skipped, users can always use /admin/contacts later.
 """
 
 import csv
 import io
 import logging
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy import select
+from sqlalchemy import select, text as sql_text
 
 from app.database import async_session
 from app.models.contact import Contact
+from app.models.house import House
 from app.repositories.base import BaseRepository
+from app.repositories.house_repo import HouseRepository
+from app.repositories.schedule_repo import ScheduleRepository
 from app.views.dashboard import _render
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
+
+TRADE_PHASES = [
+    "foundation_concrete", "framing", "plumbing_rough", "hvac_rough",
+    "electrical_rough", "drywall_plaster", "paint", "flooring",
+    "cabinets", "finish_work",
+]
 
 TRADE_LABELS = {
     "foundation_concrete": "Foundation / Concrete",
@@ -42,16 +51,105 @@ TRADE_LABELS = {
 }
 
 
-# ── Step 1: Welcome ──
+async def _get_setting(key: str) -> str:
+    """Get a tenant setting value."""
+    async with async_session() as session:
+        result = await session.execute(sql_text("SELECT value FROM tenant_settings WHERE key = :key"), {"key": key})
+        row = result.fetchone()
+        return row[0] if row else ""
+
+
+async def _set_setting(key: str, value: str) -> None:
+    """Set a tenant setting value."""
+    async with async_session() as session:
+        await session.execute(sql_text(
+            "INSERT INTO tenant_settings (key, value) VALUES (:key, :val) "
+            "ON CONFLICT (key) DO UPDATE SET value = :val"
+        ), {"key": key, "val": value})
+        await session.commit()
+
+
+# ── Step 1: Company Info ──
 @router.get("", response_class=HTMLResponse)
 async def onboarding_welcome(request: Request):
-    """Render the onboarding welcome page."""
-    html = _render("onboarding/welcome.html", request=request, trades=TRADE_LABELS)
+    """Render the onboarding welcome / company info page."""
+    company = await _get_setting("company_name")
+    html = _render("onboarding/welcome.html",
+        request=request,
+        trades=TRADE_LABELS,
+        company_name=company,
+    )
     return HTMLResponse(html)
 
 
-# ── Step 2: Import page ──
-@router.get("/import", response_class=HTMLResponse)
+@router.post("", response_class=HTMLResponse)
+async def onboarding_save_company(
+    request: Request,
+    company_name: str = Form(""),
+):
+    """Save company info and proceed to next step."""
+    if company_name.strip():
+        await _set_setting("company_name", company_name.strip())
+    return HTMLResponse("", status_code=303, headers={"Location": "/onboarding/houses"})
+
+
+# ── Step 2: Add Houses ──
+@router.get("/houses", response_class=HTMLResponse)
+async def onboarding_houses(request: Request):
+    """Show the add-houses form."""
+    company = await _get_setting("company_name")
+    html = _render("onboarding/houses.html",
+        request=request,
+        company_name=company,
+        trades=TRADE_LABELS,
+    )
+    return HTMLResponse(html)
+
+
+@router.post("/houses", response_class=HTMLResponse)
+async def onboarding_save_houses(request: Request):
+    """Save houses from the form and generate schedule items."""
+    form = await request.form()
+    addresses = form.getlist("address")
+    cities = form.getlist("city")
+
+    async with async_session() as session:
+        house_repo = HouseRepository(session)
+        schedule_repo = ScheduleRepository(session)
+
+        for i, addr in enumerate(addresses):
+            addr = addr.strip()
+            if not addr:
+                continue
+            city = cities[i].strip() if i < len(cities) else ""
+            # Create the house
+            house = await house_repo.create(
+                address=addr,
+                city=city,
+                state="WI",
+                current_phase=0,
+                overall_status="G",
+            )
+            # Generate schedule items for all 10 trades
+            today = date.today()
+            for phase_num, trade in enumerate(TRADE_PHASES):
+                await schedule_repo.create(
+                    house_id=house.id,
+                    trade=trade,
+                    scheduled_start=today + timedelta(days=phase_num * 14),
+                    scheduled_end=today + timedelta(days=phase_num * 14 + 7),
+                    status="scheduled",
+                    andon_status="G",
+                    readiness_lead_days=14 if trade in ("foundation_concrete", "framing") else 7,
+                )
+
+        await session.commit()
+
+    return HTMLResponse("", status_code=303, headers={"Location": "/onboarding/contacts"})
+
+
+# ── Step 3: Import contacts page ──
+@router.get("/contacts", response_class=HTMLResponse)
 async def onboarding_import(request: Request):
     """Render the CSV import page with instructions."""
     html = _render("onboarding/import.html",
@@ -85,7 +183,7 @@ async def download_template():
 
 
 # ── Step 3: Process import ──
-@router.post("/import", response_class=HTMLResponse)
+@router.post("/contacts", response_class=HTMLResponse)
 async def onboarding_process_import(request: Request):
     """Process the uploaded CSV file and show results."""
     from app.models.contact import Contact

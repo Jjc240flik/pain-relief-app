@@ -9,15 +9,15 @@
 
       <!-- Progress -->
       <div class="flex items-center gap-2 mb-6 text-sm">
-        <span class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">1</span>
+        <span class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">✓</span>
         <span class="text-gray-400">—</span>
-        <span class="w-8 h-8 bg-gray-200 text-gray-500 rounded-full flex items-center justify-center font-bold">2</span>
+        <span class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">✓</span>
         <span class="text-gray-400">—</span>
-        <span class="w-8 h-8 bg-gray-200 text-gray-500 rounded-full flex items-center justify-center font-bold">3</span>
+        <span class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">3</span>
       </div>
 
       <h1 class="text-2xl font-bold text-gray-900">Import Your Contacts</h1>
-      <p class="text-gray-500 mt-1 mb-6">Upload a CSV file with your subcontractors. We'll match them by phone number.</p>
+      <p class="text-gray-500 mt-1 mb-6">Upload a CSV file with your subcontractors and suppliers. We'll match them by phone number.</p>
 
       <!-- Template download -->
       <div class="bg-blue-50 rounded-xl border border-blue-200 p-4 mb-6">
@@ -26,7 +26,7 @@
            class="inline-flex items-center gap-1.5 text-sm text-blue-700 hover:text-blue-900 font-medium">
           ⬇ Download CSV Template
         </a>
-        <p class="text-xs text-blue-600 mt-1">Includes the correct columns: name, company, trade, phone, email, manager_phone, notes</p>
+        <p class="text-xs text-blue-600 mt-1">Includes columns: name, company, trade, phone, email, manager_phone, notes</p>
       </div>
 
       <!-- Error -->
@@ -37,7 +37,7 @@
       {% endif %}
 
       <!-- Upload form -->
-      <form method="post" action="/onboarding/import" enctype="multipart/form-data" class="space-y-4">
+      <form method="post" action="/onboarding/contacts" enctype="multipart/form-data" class="space-y-4">
         <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition cursor-pointer"
              onclick="document.getElementById('file-input').click()">
           <div class="text-4xl mb-2">📁</div>
@@ -46,7 +46,7 @@
           <input id="file-input" type="file" name="file" accept=".csv,.xlsx" class="hidden" required>
         </div>
 
-        <p class="text-xs text-gray-400">Supported: CSV files with the columns shown in the template.</p>
+        <p class="text-xs text-gray-400">Supported: CSV files with columns shown in the template.</p>
 
         <div class="flex gap-3">
           <a href="/onboarding/add" class="flex-1 px-4 py-3 text-center text-sm text-gray-700 font-medium bg-gray-100 rounded-xl hover:bg-gray-200 transition">
@@ -59,7 +59,7 @@
       </form>
 
       <div class="mt-4 text-center">
-        <a href="/onboarding/skip" class="text-sm text-gray-400 hover:text-gray-600">Skip this step →</a>
+        <a href="/onboarding/skip" class="text-sm text-gray-400 hover:text-gray-600">Done — go to dashboard →</a>
       </div>
 
     </div>
