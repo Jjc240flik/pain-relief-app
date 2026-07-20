@@ -263,7 +263,7 @@ function submitDatePush(event) {
   closeDatePicker();
   fetch('/dashboard/' + itemId + '/push-custom', { method: 'POST', body: formData })
     .then(function() {
-      htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'outerHTML'});
+      htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'innerHTML'});
     });
 }
 
@@ -293,7 +293,7 @@ document.addEventListener('click', function() {
 
 // Auto-refresh every 60s
 setInterval(function() {
-  htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'outerHTML'});
+  htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'innerHTML'});
 }, 60000);
 
 // ── Media gallery state ──
@@ -442,9 +442,10 @@ function closeVideo() {
 }
 
 // ── Classification feedback ──
+var _selectedStatus = {};
+
 function confirmClassification(itemId) {
   // 👍 clicked — user confirmed the classification is correct
-  // Hide the feedback widget — no status change needed
   document.getElementById('fb-default-' + itemId).classList.add('hidden');
   document.getElementById('fb-done-' + itemId).classList.remove('hidden');
   document.getElementById('fb-done-' + itemId).querySelector('span').textContent = '✓ Confirmed';
@@ -454,13 +455,28 @@ function showCorrection(itemId) {
   // 👎 clicked — show the correction picker
   document.getElementById('fb-default-' + itemId).classList.add('hidden');
   document.getElementById('fb-picker-' + itemId).classList.remove('hidden');
+  _selectedStatus[itemId] = null;
+  // Highlight nothing — user must pick
+  document.querySelectorAll('.status-btn-' + itemId).forEach(function(b) {
+    b.style.opacity = '0.5';
+  });
   // Focus the comment field
   var comment = document.getElementById('fb-comment-' + itemId);
   if (comment) setTimeout(function() { comment.focus(); }, 100);
 }
 
-function applyCorrection(itemId, newStatus) {
-  // Send correction to the resolve endpoint with correct_status
+function selectStatus(itemId, status) {
+  _selectedStatus[itemId] = status;
+  // Highlight the selected button, dim others
+  document.querySelectorAll('.status-btn-' + itemId).forEach(function(b) {
+    b.style.opacity = b.getAttribute('data-status') === status ? '1' : '0.5';
+  });
+}
+
+function submitCorrection(itemId) {
+  var newStatus = _selectedStatus[itemId];
+  if (!newStatus) { alert('Please select a status first'); return; }
+  
   var form = new FormData();
   form.append('correct_status', newStatus);
   
@@ -477,7 +493,7 @@ function applyCorrection(itemId, newStatus) {
   // Send correction and refresh
   fetch('/dashboard/' + itemId + '/resolve', { method: 'POST', body: form })
     .then(function() {
-      htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'outerHTML'});
+      htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'innerHTML'});
     });
 }
 
@@ -513,7 +529,7 @@ function submitDelegate() {
   form.append('delegation_note', note);
   closeDelegateModal();
   fetch('/dashboard/' + itemId + '/delegate', { method: 'POST', body: form })
-    .then(function() { htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'outerHTML'}); });
+    .then(function() { htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'innerHTML'}); });
 }
 
 // ── Contextual actions ──

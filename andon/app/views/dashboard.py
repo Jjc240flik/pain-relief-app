@@ -117,7 +117,6 @@ def _build_push_updates(item: ScheduleItem, days: int) -> dict:
 # ── Contextual quick actions per trade ──
 CONTEXTUAL_ACTIONS = {
     "framing": [
-        {"label": "Check Truss Specs", "icon": "📐", "action": "prefill_note", "message": "Verify truss specifications at {address} — check for damage on delivery."},
         {"label": "Call Supplier", "icon": "📞", "action": "call_contact"},
         {"label": "Request Inspection", "icon": "🔍", "action": "prefill_note", "message": "Schedule framing inspection at {address} — ready for review."},
     ],
