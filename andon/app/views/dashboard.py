@@ -543,8 +543,8 @@ async def dashboard_partial(
 async def resolve_item(
     request: Request,
     item_id: UUID,
-    correct_status: str = "G",
-    comment: str = "",
+    correct_status: str = Form("G"),
+    comment: str = Form(""),
     session: AsyncSession = Depends(get_db),
 ):
     """Resolve: set andon_status to Green, log event, return updated row list.
