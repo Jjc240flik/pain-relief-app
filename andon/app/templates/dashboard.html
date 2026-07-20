@@ -56,8 +56,7 @@
 <main class="max-w-3xl mx-auto px-4 py-6">
 
   <!-- ── ESCALATION BANNERS ── -->
-  {% include "partials/escalation_banners.html" %}
-
+  
   <div id="house-list" class="space-y-3">
     {% include "partials/house_rows.html" %}
   </div>
@@ -521,18 +520,6 @@ function submitDelegate() {
 function prefillDelegationNote(itemId, note) {
   openDelegateModal(itemId);
   document.getElementById('delegate-note').value = note;
-}
-
-// ── Escalation ──
-function sendEscalation(itemId, message) {
-  if (!confirm('Send this escalation message?')) return;
-  var form = new FormData();
-  form.append('message', message);
-  fetch('/dashboard/' + itemId + '/send-escalation', { method: 'POST', body: form })
-    .then(function() {
-      htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'outerHTML'});
-      // Remove all escalation banners (HTMX will replace them with fresh data)
-    });
 }
 </script>
 

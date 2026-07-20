@@ -152,128 +152,8 @@ def _get_contextual_actions(trade: str, last_message: str | None) -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════════
-# ESCALATION CONFIGURATION
+# RENDERING HELPERS
 # ═══════════════════════════════════════════════════════════════
-
-# Default escalation groups
-DEFAULT_ESCALATION_GROUPS = {
-    "Critical Issues Group": {
-        "members": ["Brian (Owner)", "Clint (Foreman)"],
-        "trigger_red_hours": 4,          # Alert if Red open > 4 hours
-        "trigger_multi_red": 2,           # Alert if 2+ Red on same house
-        "trigger_keywords": ["structural", "safety", "fire", "flood", "gas leak", "collapse", "electrical fire"],
-    },
-    "Owner Only": {
-        "members": ["Brian (Owner)"],
-        "trigger_red_hours": 8,           # Alert if Red open > 8 hours
-        "trigger_multi_red": 3,           # Alert if 3+ Red on same house
-        "trigger_keywords": [],
-    },
-}
-
-ESCALATION_CONFIG_FILE = Path(__file__).parent.parent / "escalation_config.json"
-
-
-def _load_escalation_config() -> dict:
-    """Load escalation group configuration from JSON file."""
-    if ESCALATION_CONFIG_FILE.exists():
-        try:
-            with open(ESCALATION_CONFIG_FILE) as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return dict(DEFAULT_ESCALATION_GROUPS)
-
-
-def _check_escalations(items: list[dict]) -> list[dict]:
-    """Evaluate items against escalation triggers. Returns list of escalation messages."""
-    from datetime import datetime, timezone, timedelta
-
-    cfg = _load_escalation_config()
-    escalations = []
-    now = datetime.now(timezone.utc)
-
-    # Group items by house
-    by_house: dict[str, list[dict]] = {}
-    for item in items:
-        by_house.setdefault(item["house_id"], []).append(item)
-
-    for group_name, group in cfg.items():
-        trigger_hours = group.get("trigger_red_hours", 99)
-        trigger_multi = group.get("trigger_multi_red", 99)
-        trigger_kw = [k.lower() for k in group.get("trigger_keywords", [])]
-        members = group.get("members", [])
-
-        # Check each Red item for time-based escalation
-        for item in items:
-            if item["andon_status"] != "R":
-                continue
-            last_touch = item.get("last_touch_ts")
-            if not last_touch:
-                continue
-            # Calculate how long Red has been open
-            if isinstance(last_touch, datetime):
-                hours_open = (now - last_touch).total_seconds() / 3600
-                if hours_open >= trigger_hours:
-                    escalations.append({
-                        "group": group_name,
-                        "members": ", ".join(members),
-                        "reason": f"Red issue open for {int(hours_open)} hours",
-                        "message": f"🚨 ESCALATION: {item['address']} — {item['trade_display']} issue has been open for {int(hours_open)} hours with no resolution. Current status: {item['activity_label']}",
-                        "address": item["address"],
-                        "trade": item["trade_display"],
-                        "item_id": item["id"],
-                    })
-
-        # Check each Red item individually (one escalation per issue, no grouping)
-        for item in items:
-            if item["andon_status"] != "R":
-                continue
-            addr = item["address"]
-            trade = item["trade_display"]
-            item_id = item["id"]
-            # Check if this specific item already has a time-based escalation
-            already_has = any(e.get("item_id") == item_id for e in escalations)
-            if not already_has:
-                escalations.append({
-                    "group": group_name,
-                    "members": ", ".join(members),
-                    "reason": f"Red issue: {trade} at {addr}",
-                    "message": f"🚨 ESCALATION: {addr} — {trade} issue requires immediate attention.",
-                    "address": addr,
-                    "trade": trade,
-                    "item_id": item_id,
-                })
-
-        # Check for keyword-based escalations
-        for item in items:
-            msg = (item.get("last_message") or "").lower()
-            for kw in trigger_kw:
-                if kw in msg:
-                    if not any(e["address"] == item["address"] and e["reason"] == f"Keyword: {kw}" for e in escalations):
-                        escalations.append({
-                            "group": group_name,
-                            "members": ", ".join(members),
-                            "reason": f"Keyword: {kw}",
-                            "message": f"🚨 ESCALATION: {item['address']} — {item['trade_display']} issue contains high-severity keyword '{kw}': {item['last_message'][:100]}",
-                            "address": item["address"],
-                            "trade": item["trade_display"],
-                            "item_id": item["id"],
-                        })
-
-    # Deduplicate by item_id (each Red issue gets its own banner, no collapsing)
-    seen = set()
-    unique = []
-    for e in escalations:
-        if e.get("item_id") not in seen:
-            seen.add(e.get("item_id"))
-            unique.append(e)
-
-    return unique[:5]  # Max 5 escalation banners at once
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _time_ago(dt: datetime | None) -> str | None:
     """Human-readable time since last touch."""
@@ -636,7 +516,6 @@ async def dashboard_page(
     today = date.today().strftime("%B %d, %Y")
     red_count = sum(1 for i in items if i["andon_status"] == "R")
     yellow_count = sum(1 for i in items if i["andon_status"] == "Y")
-    escalations = _check_escalations(items)
 
     html = _render(
         "dashboard.html",
@@ -644,7 +523,6 @@ async def dashboard_page(
         today=today,
         red_count=red_count,
         yellow_count=yellow_count,
-        escalations=escalations,
         user=user,
     )
     return HTMLResponse(html)
@@ -656,18 +534,9 @@ async def dashboard_partial(
     session: AsyncSession = Depends(get_db),
     user: dict = Depends(require_admin),
 ):
-    """HTMX partial — returns only the house_rows partial + escalation banners."""
-    items = await _get_red_yellow_items(session)
+    """HTMX partial — returns the house rows partial (no escalation banners)."""
     rows_html = await _render_rows(session)
-    escalations = _check_escalations(items)
-
-    # Render escalation banner partial
-    esc_html = ""
-    if escalations:
-        esc_html = _render("partials/escalation_banners.html", escalations=escalations)
-
-    combined = esc_html + rows_html
-    return HTMLResponse(combined)
+    return HTMLResponse(rows_html)
 
 
 @router.post("/dashboard/{item_id}/resolve")
@@ -886,57 +755,6 @@ async def update_delegation_status(
         await repo.update(item_id, delegation_status="in_progress")
         await _log_action(session, item_id, "Delegation marked in progress", "Delegation")
 
-    await session.commit()
-
-    html = await _render_rows(session)
-    return HTMLResponse(html)
-
-
-@router.post("/dashboard/{item_id}/send-escalation")
-async def send_escalation(
-    request: Request,
-    item_id: UUID,
-    message: str = Form(""),
-    session: AsyncSession = Depends(get_db),
-):
-    """Log and persist an escalation. Saves to both Events table and escalations table."""
-    from sqlalchemy import text as sql_text
-    from app.models.event import Event
-    from sqlalchemy.orm import selectinload
-
-    # Find the schedule item for address/trade context (eagerly load house)
-    stmt = select(ScheduleItem).options(selectinload(ScheduleItem.house)).where(ScheduleItem.id == item_id)
-    result = await session.execute(stmt)
-    item = result.scalar_one_or_none()
-    address = item.house.address if item and item.house else "Unknown"
-    trade_display = TRADE_LABELS.get(item.trade, item.trade) if item else "Unknown"
-
-    # Parse the escalation message for structured fields
-    reason = "Manual escalation"
-    group_name = "Project Manager"
-    members = ""
-    for line in message.split("\n"):
-        if "ESCALATION:" in line:
-            reason = line.strip()[:200]
-
-    # Insert into escalations table
-    esc_id = uuid4()
-    await session.execute(sql_text(
-        "INSERT INTO escalations (id, schedule_item_id, house_address, trade, reason, message, group_name, members, status, created_at) "
-        "VALUES (:id, :sid, :addr, :trade, :reason, :msg, :group, :members, 'sent', NOW())"
-    ), {
-        "id": esc_id,
-        "sid": item_id,
-        "addr": address,
-        "trade": trade_display,
-        "reason": reason,
-        "msg": message[:500],
-        "group": group_name,
-        "members": members,
-    })
-
-    # Also log via existing mechanism
-    await _log_action(session, item_id, f"Escalation sent: {message[:200]}", "Escalation")
     await session.commit()
 
     html = await _render_rows(session)
