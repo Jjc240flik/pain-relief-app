@@ -628,12 +628,15 @@ async def push_custom_item(
     new_start_date: str = Form(...),
     cascade: str = Form("none"),
     selected_trades: str = Form(""),
+    trade_dates: str = Form(""),
+    notify: str = Form(""),
     session: AsyncSession = Depends(get_db),
 ):
     """Push schedule to a specific date, log event, return updated row list.
 
-    cascade: "none" | "next" | "all" | "selected"
-    When cascade is used, the same date shift is applied to following trades.
+    cascade: "none" | "next" | "selected"
+    When cascade="selected", trade_dates contains "trade:YYYY-MM-DD,..." pairs.
+    notify contains comma-separated roles: "Boss,Office,Staff"
     """
     repo = ScheduleRepository(session)
     item = await repo.get(item_id)
@@ -664,18 +667,63 @@ async def push_custom_item(
                         await repo.update(sibling.id, **su)
                     await _log_action(session, sibling.id, f"Cascade push +{days_diff} day(s) from {item.trade} (custom date)")
 
+            async def _set_trade_date(trade_name: str, target_date_str: str) -> None:
+                """Set a specific date for a cascaded trade (per-trade calendar)."""
+                try:
+                    target_date = date.fromisoformat(target_date_str)
+                except ValueError:
+                    return
+                sibling = await repo.get_by_trade_and_house(item.house_id, trade_name)
+                if sibling and sibling.id != item_id:
+                    td_updates = {"scheduled_start": target_date}
+                    if sibling.scheduled_end:
+                        # Shift end date by same offset as start date
+                        sib_diff = (target_date - sibling.scheduled_start).days
+                        td_updates["scheduled_end"] = sibling.scheduled_end + timedelta(days=sib_diff)
+                    await repo.update(sibling.id, **td_updates)
+                    await _log_action(session, sibling.id, f"Custom date set: {target_date}", f"From {item.trade}")
+
             if cascade == "next":
                 following_trades = _get_following_trades(item.trade)
                 if following_trades:
                     await _push_cascade_trade(following_trades[0])
-            elif cascade == "all":
-                following_trades = _get_following_trades(item.trade)
-                for trade_name in following_trades:
-                    await _push_cascade_trade(trade_name)
-            elif cascade == "selected" and selected_trades:
-                targets = [t.strip() for t in selected_trades.split(",") if t.strip()]
-                for t in targets:
-                    await _push_cascade_trade(t)
+            elif cascade == "selected" and trade_dates:
+                # Parse "trade:YYYY-MM-DD,trade:YYYY-MM-DD" pairs
+                for pair in trade_dates.split(","):
+                    pair = pair.strip()
+                    if ":" in pair:
+                        t_name, t_date = pair.split(":", 1)
+                        await _set_trade_date(t_name.strip(), t_date.strip())
+
+        # ── Send notifications to selected roles ──
+        if notify:
+            from app.services.outbound import OutboundService
+            from app.repositories.contact_repo import ContactRepository
+            outbound = OutboundService()
+            contact_repo = ContactRepository(session)
+            contact = None
+            if item.trade:
+                contacts = await contact_repo.get_by_trade(item.trade)
+                for c in contacts:
+                    if c.is_active:
+                        contact = c
+                        break
+                if not contact and contacts:
+                    contact = contacts[0]
+            roles = [r.strip() for r in notify.split(",") if r.strip()]
+            address = item.house.address if item.house else "Unknown"
+            msg = f"TLG Andon — Schedule updated: {item.trade} at {address}. New date: {new_start_date}."
+            for role in roles:
+                phone = None
+                if role == "Boss" and contact:
+                    phone = contact.manager_phone
+                elif role == "Office" and contact:
+                    phone = contact.phone
+                elif role == "Staff" and contact:
+                    phone = contact.phone
+                if phone:
+                    await outbound.send_sms(phone, msg, item.house_id, item.trade)
+                logger.info("Schedule notify: role=%s phone=%s msg=%s", role, phone, msg)
 
         await session.commit()
 
