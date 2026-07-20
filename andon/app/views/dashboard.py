@@ -68,10 +68,7 @@ TRADE_PHASES = [
     "cabinets", "finish_work",
 ]
 
-TRADE_NOTES = {
-    "foundation_concrete": "Extra midpoint checks active",
-    "framing": "Selective escalation active",
-}
+TRADE_NOTES = {}
 
 
 # ── Cascade push helpers ──
