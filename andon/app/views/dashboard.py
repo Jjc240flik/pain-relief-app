@@ -554,6 +554,19 @@ async def dashboard_partial(
 ):
     """HTMX partial — returns the house rows partial, optionally filtered."""
     rows_html = await _render_rows(session, filter or None)
+    # Track dashboard view (non-auto-refresh)
+    try:
+        from sqlalchemy import text as sql_text
+        import uuid as _uuid
+        u = request.state.user if hasattr(request, 'state') and hasattr(request.state, 'user') else None
+        if u:
+            await session.execute(sql_text(
+                "INSERT INTO user_activity_events (company_id, user_id, session_id, event_type, route, occurred_at) "
+                "VALUES ((SELECT id FROM subscribers LIMIT 1), :uid, :sid, 'dashboard_opened', '/dashboard/partial', NOW())"
+            ), {"uid": u.get("username", "unknown"), "sid": str(_uuid.uuid4())})
+            await session.commit()
+    except Exception:
+        pass
     return HTMLResponse(rows_html)
 
 
@@ -636,6 +649,19 @@ async def push_item(
             await _push_trade(t)
 
     await session.commit()
+    # Track card action
+    try:
+        import uuid as _uuid
+        from sqlalchemy import text as sql_text
+        u = request.state.user if hasattr(request, 'state') and hasattr(request.state, 'user') else None
+        if u:
+            await session.execute(sql_text(
+                "INSERT INTO user_activity_events (company_id, user_id, session_id, event_type, route, occurred_at) "
+                "VALUES ((SELECT id FROM subscribers LIMIT 1), :uid, :sid, 'card_action_taken', '/dashboard/resolve', NOW())"
+            ), {"uid": u.get("username", "unknown"), "sid": str(_uuid.uuid4())})
+            await session.commit()
+    except Exception:
+        pass
     html = await _render_rows(session)
     return HTMLResponse(html)
 

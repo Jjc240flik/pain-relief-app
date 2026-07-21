@@ -4,6 +4,7 @@ import logging
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from sqlalchemy import text
 
 from app.services.auth import (
     create_access_token,
@@ -52,6 +53,20 @@ async def login(
 
     response = RedirectResponse(url="/dashboard", status_code=303)
     set_token_cookie(response, token)
+    # Track login activity
+    try:
+        from app.database import async_session
+        import uuid as _uuid
+        async with async_session() as s:
+            sid_val = str(_uuid.uuid4())
+            await s.execute(
+                text("""INSERT INTO user_activity_events (company_id, user_id, session_id, event_type, route, occurred_at)
+                   VALUES ((SELECT id FROM subscribers LIMIT 1), :uid, :sid, 'user_login', '/auth/login', NOW())"""),
+                {"uid": username, "sid": sid_val}
+            )
+            await s.commit()
+    except Exception:
+        pass
     return response
 
 

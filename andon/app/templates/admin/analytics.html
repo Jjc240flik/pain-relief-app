@@ -28,6 +28,96 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- PILOT HEALTH                                                  -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  {% if pilot and pilot.active %}
+  <div class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">🚀 Pilot Health — {{ pilot.pilot_name }}</h2>
+      <span class="text-xs text-gray-400">{{ days }}-day view</span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-sm">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full {% if pilot.logged_in_today %}bg-green-500{% else %}bg-red-500{% endif %}"></span>
+        <span>{% if pilot.logged_in_today %}Logged in today{% else %}Not logged in today{% endif %}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full {% if pilot.first_dashboard_today %}bg-green-500{% else %}bg-gray-300{% endif %}"></span>
+        <span>{% if pilot.first_dashboard_today %}First dashboard: {{ pilot.first_dashboard_today }}{% else %}No dashboard visit today{% endif %}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full
+          {% if pilot.morning_dashboard_first == 'yes' %}bg-green-500
+          {% elif pilot.morning_dashboard_first == 'no' %}bg-red-500
+          {% else %}bg-yellow-400{% endif %}"></span>
+        <span title="{{ pilot.morning_method }}">Morning First:
+          {% if pilot.morning_dashboard_first == 'yes' %}Yes
+          {% elif pilot.morning_dashboard_first == 'no' %}No
+          {% else %}Unknown{% endif %}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full {% if pilot.resolved_today > 0 %}bg-green-500{% else %}bg-gray-300{% endif %}"></span>
+        <span>{{ pilot.resolved_today }} resolved today</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full {% if pilot.dash_visits_today > 0 %}bg-blue-500{% else %}bg-gray-300{% endif %}"></span>
+        <span>{{ pilot.dash_visits_today }} dashboard visits</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full {% if pilot.open_red > 0 %}bg-red-500{% else %}bg-green-500{% endif %}"></span>
+        <span>{{ pilot.open_red }} Red open</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full {% if pilot.open_yellow > 0 %}bg-yellow-400{% else %}bg-green-500{% endif %}"></span>
+        <span>{{ pilot.open_yellow }} Yellow open</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full {% if pilot.stale_yellow > 0 %}bg-yellow-400{% else %}bg-green-500{% endif %}"></span>
+        <span>{% if pilot.stale_yellow > 0 %}{{ pilot.stale_yellow }} Yellow >{{ pilot.stale_yellow_hours }}h{% else %}No stale Yellow{% endif %}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full {% if pilot.stale_red > 0 %}bg-red-500{% else %}bg-green-500{% endif %}"></span>
+        <span>{% if pilot.stale_red > 0 %}{{ pilot.stale_red }} Red >{{ pilot.stale_red_hours }}h{% else %}No stale Red{% endif %}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full {% if pilot.classifier_corrections == 0 %}bg-green-500{% else %}bg-yellow-400{% endif %}"></span>
+        <span>{{ pilot.classifier_corrections }} corrections ({{ pilot.correction_rate }}%)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- NORTH STAR — Issues Detected and Resolved                  -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Issues Detected</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1">{{ north_star.detected }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Issues Resolved</p>
+      <p class="text-2xl font-bold text-green-600 mt-1">{{ north_star.resolved }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Resolution Rate</p>
+      <p class="text-2xl font-bold text-blue-600 mt-1">{{ north_star.resolution_rate }}%</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Open Issues</p>
+      <p class="text-2xl font-bold {% if north_star.open_issues > 0 %}text-red-600{% else %}text-green-600{% endif %} mt-1">{{ north_star.open_issues }}</p>
+    </div>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+    <div class="flex items-center gap-2 text-sm text-gray-400">
+      <span>🚀 Pilot Health</span>
+      <span>—</span>
+      <span>{% if pilot and pilot.error %}Error loading pilot data{% else %}Configure a pilot to begin monitoring{% endif %}</span>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
   <!-- SECTION 1: Usage Metrics                                   -->
   <!-- ═══════════════════════════════════════════════════════════ -->
   <h2 class="text-lg font-semibold text-gray-800 mb-3">📊 Usage Metrics</h2>

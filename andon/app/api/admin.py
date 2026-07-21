@@ -274,12 +274,201 @@ async def admin_analytics(
             sql_text("SELECT id, company_name FROM subscribers ORDER BY company_name")
         )).fetchall()
 
+        # ═══════════════════════════════════════════════════════════════
+        # PILOT HEALTH METRICS
+        # ═══════════════════════════════════════════════════════════════
+
+        pilot = {}
+        open_red = 0
+        open_yellow = 0
+        try:
+            cfg = (await session.execute(sql_text(
+                "SELECT pilot_user_id, pilot_user_name, expected_morning_start_time, "
+                "stale_yellow_hours, stale_red_hours, timezone, active "
+                "FROM pilot_config WHERE active = true LIMIT 1"
+            ))).fetchone()
+
+            if cfg:
+                puser = cfg.pilot_user_id
+                pname = cfg.pilot_user_name or puser
+                tz_name = cfg.timezone or "America/Chicago"
+                stale_y = cfg.stale_yellow_hours or 24
+                stale_r = cfg.stale_red_hours or 4
+
+                # 1. Logged in today
+                login_today = (await session.execute(sql_text(
+                    "SELECT occurred_at FROM user_activity_events "
+                    "WHERE user_id = :uid AND event_type = 'user_login' "
+                    "AND occurred_at >= CURRENT_DATE ORDER BY occurred_at DESC LIMIT 1"
+                ), {"uid": puser})).fetchone()
+
+                # 2. Dashboard opened today
+                dash_today = (await session.execute(sql_text(
+                    "SELECT occurred_at FROM user_activity_events "
+                    "WHERE user_id = :uid AND event_type = 'dashboard_opened' "
+                    "AND occurred_at >= CURRENT_DATE ORDER BY occurred_at ASC"
+                ), {"uid": puser})).fetchall()
+
+                # 3. First operational action today (resolve, date, delegate, call)
+                first_action = (await session.execute(sql_text(
+                    "SELECT occurred_at FROM user_activity_events "
+                    "WHERE user_id = :uid AND event_type = 'card_action_taken' "
+                    "AND occurred_at >= CURRENT_DATE ORDER BY occurred_at ASC LIMIT 1"
+                ), {"uid": puser})).fetchone()
+
+                # 4. First outbound SMS today
+                first_outbound = (await session.execute(
+                    select(Event.timestamp).where(
+                        Event.direction == "outbound", Event.channel == "sms",
+                        Event.timestamp >= func.now() - sql_text("INTERVAL '1 day'")
+                    ).order_by(Event.timestamp.asc()).limit(1)
+                )).scalar()
+
+                # 5. First inbound message today
+                first_inbound = (await session.execute(
+                    select(Event.timestamp).where(
+                        Event.direction == "inbound",
+                        Event.timestamp >= func.now() - sql_text("INTERVAL '1 day'")
+                    ).order_by(Event.timestamp.asc()).limit(1)
+                )).scalar()
+
+                # Morning Dashboard First logic
+                morning_first = "unknown"
+                morning_method = ""
+                if login_today and dash_today:
+                    first_dash = dash_today[0][0] if dash_today else None
+                    # Compare against various operational actions
+                    comparators = []
+                    if first_action:
+                        comparators.append(("first action", first_action[0]))
+                    if first_outbound:
+                        comparators.append(("first outbound SMS", first_outbound))
+                    if first_inbound:
+                        comparators.append(("first inbound message", first_inbound))
+
+                    if comparators and first_dash:
+                        earliest_op = min(c[1] for c in comparators)
+                        if first_dash < earliest_op:
+                            morning_first = "yes"
+                            morning_method = f"Dashboard opened before platform {comparators[0][0]}."
+                        else:
+                            morning_first = "no"
+                            morning_method = "Operational action occurred before dashboard open."
+                    elif first_dash:
+                        morning_first = "unknown"
+                        morning_method = "No operational actions recorded today to compare."
+
+                # Resolution metrics
+                resolved_r = (await session.execute(sql_text(
+                    "SELECT count(*) FROM schedule_items WHERE andon_status = 'G' "
+                    "AND last_touch_ts >= :since AND trade IS NOT NULL"
+                ), {"since": since})).scalar() or 0
+
+                resolved_y = (await session.execute(sql_text(
+                    "SELECT count(*) FROM schedule_items WHERE andon_status = 'G' "
+                    "AND last_touch_ts >= :since AND trade IS NOT NULL"
+                ), {"since": since})).scalar() or 0
+
+                # Cards opened (detected issues today)
+                detected_today = (await session.execute(sql_text(
+                    "SELECT count(*) FROM schedule_items WHERE "
+                    "andon_status IN ('R','Y') AND last_touch_ts >= CURRENT_DATE"
+                ))).scalar() or 0
+
+                resolved_today = (await session.execute(sql_text(
+                    "SELECT count(*) FROM schedule_items WHERE "
+                    "andon_status = 'G' AND last_touch_ts >= CURRENT_DATE"
+                ))).scalar() or 0
+
+                # Stale cards
+                stale_yellow = (await session.execute(sql_text(
+                    "SELECT count(*) FROM schedule_items WHERE andon_status = 'Y' "
+                    "AND last_touch_ts < NOW() - :stale * INTERVAL '1 hour'"
+                ), {"stale": stale_y})).scalar() or 0
+
+                stale_red = (await session.execute(sql_text(
+                    "SELECT count(*) FROM schedule_items WHERE andon_status = 'R' "
+                    "AND last_touch_ts < NOW() - :stale * INTERVAL '1 hour'"
+                ), {"stale": stale_r})).scalar() or 0
+
+                open_red = (await session.execute(
+                    select(func.count()).select_from(ScheduleItem).where(
+                        ScheduleItem.andon_status == "R")
+                )).scalar() or 0
+
+                open_yellow = (await session.execute(
+                    select(func.count()).select_from(ScheduleItem).where(
+                        ScheduleItem.andon_status == "Y")
+                )).scalar() or 0
+
+                # Classifier corrections
+                corrections = (await session.execute(
+                    select(func.count()).select_from(Event).where(
+                        Event.full_text.like("[CLASSIFICATION CORRECTION]%"),
+                        Event.timestamp >= since)
+                )).scalar() or 0
+
+                total_classified = (await session.execute(
+                    select(func.count()).select_from(Event).where(
+                        Event.outcome.isnot(None), Event.timestamp >= since)
+                )).scalar() or 0
+
+                pilot = {
+                    "active": True,
+                    "pilot_name": pname,
+                    "logged_in_today": login_today is not None,
+                    "last_login": login_today[0].strftime("%I:%M %p %Z") if login_today else None,
+                    "first_dashboard_today": dash_today[0][0].strftime("%I:%M %p") if dash_today else None,
+                    "dash_visits_today": len(dash_today),
+                    "morning_dashboard_first": morning_first,
+                    "morning_method": morning_method,
+                    "detected_today": detected_today,
+                    "resolved_today": resolved_today,
+                    "open_red": open_red,
+                    "open_yellow": open_yellow,
+                    "stale_yellow": stale_yellow,
+                    "stale_red": stale_red,
+                    "classifier_corrections": corrections,
+                    "total_classified": total_classified,
+                    "correction_rate": round(corrections / total_classified * 100, 1) if total_classified > 0 else 0,
+                    "stale_yellow_hours": stale_y,
+                    "stale_red_hours": stale_r,
+                }
+            else:
+                pilot = {"active": False, "pilot_name": "Not configured"}
+        except Exception as exc:
+            logger.warning("Pilot metrics error: %s", exc)
+            pilot = {"active": False, "pilot_name": "Error", "error": str(exc)}
+
+        # North Star metrics
+        north_star = {}
+        try:
+            ns_detected = (await session.execute(
+                select(func.count()).select_from(Event).where(
+                    Event.outcome.isnot(None), Event.timestamp >= since, *sub_filter)
+            )).scalar() or 0
+            ns_resolved = (await session.execute(sql_text(
+                "SELECT count(*) FROM schedule_items WHERE "
+                "andon_status = 'G' AND last_touch_ts >= :since"
+            ), {"since": since})).scalar() or 0
+            ns_rate = round(ns_resolved / ns_detected * 100, 1) if ns_detected > 0 else 0
+            north_star = {
+                "detected": ns_detected,
+                "resolved": ns_resolved,
+                "resolution_rate": ns_rate,
+                "open_issues": open_red + open_yellow,
+            }
+        except Exception as exc:
+            logger.warning("North Star error: %s", exc)
+            north_star = {"detected": 0, "resolved": 0, "resolution_rate": 0, "open_issues": 0}
+
     html = _render("admin/analytics.html",
         request=request, days=days, usage=usage, usage_trends=trends,
         costs=costs, issues=issues, trade_breakdown=trade_breakdown,
         top_subs=top_subs, health=health, today=today, rates=DEFAULT_RATES,
         alerts=_check_alerts(_load_alerts(), usage, costs, health),
         subscribers=all_subs, current_sub_id=subscriber_id, sub_name=sub_name,
+        pilot=pilot, north_star=north_star,
     )
     return HTMLResponse(html)
 
