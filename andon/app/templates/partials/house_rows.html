@@ -100,7 +100,7 @@
                      bg-gray-50 text-gray-600 hover:bg-gray-100">
         📅 Date
       </button>
-      {% if item.time_ago %}<span class="text-[10px] text-gray-400 ml-1">{{ item.time_ago }}</span>{% endif %}
+      {% if item.time_ago %}<span class="text-[10px] text-gray-400 ml-3 mr-1">{{ item.time_ago }}</span>{% endif %}
       {% if item.sub_phone %}
       <div class="relative inline-block contact-dropdown">
         <button onclick="toggleDropdown(event, 'dd-{{ item.id }}')"
