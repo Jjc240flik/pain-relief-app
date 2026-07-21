@@ -15,24 +15,27 @@
     <div class="flex items-center gap-3">
       <!-- Red count -->
       <span id="badge-red"
-            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold
-                   {% if red_count > 0 %}bg-red-100 text-red-700{% else %}bg-gray-100 text-gray-400{% endif %}">
+            onclick="setFilter('R')"
+            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold cursor-pointer transition
+                   {% if active_filter == 'R' %}ring-2 ring-red-400 bg-red-200 text-red-800{% elif red_count > 0 %}bg-red-100 text-red-700 hover:bg-red-200{% else %}bg-gray-100 text-gray-400{% endif %}">
         <span class="w-2 h-2 rounded-full {% if red_count > 0 %}bg-red-500{% else %}bg-gray-300{% endif %}"></span>
         {{ red_count }} Red
       </span>
       <!-- Yellow count -->
       <span id="badge-yellow"
-            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold
-                   {% if yellow_count > 0 %}bg-yellow-100 text-yellow-700{% else %}bg-gray-100 text-gray-400{% endif %}">
+            onclick="setFilter('Y')"
+            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold cursor-pointer transition
+                   {% if active_filter == 'Y' %}ring-2 ring-yellow-400 bg-yellow-200 text-yellow-800{% elif yellow_count > 0 %}bg-yellow-100 text-yellow-700 hover:bg-yellow-200{% else %}bg-gray-100 text-gray-400{% endif %}">
         <span class="w-2 h-2 rounded-full {% if yellow_count > 0 %}bg-yellow-400{% else %}bg-gray-300{% endif %}"></span>
         {{ yellow_count }} Yellow
       </span>
-      <!-- Refresh -->
+      <!-- Refresh (resets filter) -->
       <button hx-get="/dashboard/partial"
               hx-target="#house-list"
               hx-indicator="#refresh-spin"
+              onclick="clearFilter()"
               class="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
-              title="Refresh">
+              title="Refresh — show all issues">
         <svg id="refresh-spin" class="w-5 h-5 htmx-indicator animate-spin hidden" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
@@ -375,9 +378,31 @@ document.addEventListener('click', function() {
   });
 });
 
-// Auto-refresh every 60s
+// ── Filter: Red / Yellow badges ──
+function setFilter(status) {
+  htmx.ajax('GET','/dashboard/partial?f=' + status, {target:'#house-list',swap:'innerHTML'});
+  // Update badge visual state
+  document.querySelectorAll('#badge-red, #badge-yellow').forEach(function(b) {
+    b.classList.remove('ring-2', 'ring-red-400', 'ring-yellow-400', 'bg-red-200', 'bg-yellow-200', 'text-red-800', 'text-yellow-800');
+  });
+  var badge = document.getElementById(status === 'R' ? 'badge-red' : 'badge-yellow');
+  if (badge) {
+    badge.classList.add('ring-2', status === 'R' ? 'ring-red-400' : 'ring-yellow-400');
+  }
+}
+function clearFilter() {
+  document.querySelectorAll('#badge-red, #badge-yellow').forEach(function(b) {
+    b.classList.remove('ring-2', 'ring-red-400', 'ring-yellow-400', 'bg-red-200', 'bg-yellow-200', 'text-red-800', 'text-yellow-800');
+  });
+}
+
+// ── Auto-refresh every 60s (preserves current filter) ──
 setInterval(function() {
-  htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'innerHTML'});
+  var f = '';
+  if (document.getElementById('badge-red').classList.contains('ring-2')) f = 'R';
+  else if (document.getElementById('badge-yellow').classList.contains('ring-2')) f = 'Y';
+  var url = f ? '/dashboard/partial?f=' + f : '/dashboard/partial';
+  htmx.ajax('GET', url, {target:'#house-list',swap:'innerHTML'});
 }, 60000);
 
 // ── Media gallery state ──

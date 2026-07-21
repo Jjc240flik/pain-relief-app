@@ -254,12 +254,20 @@ def _count_media_by_type(latest_event, category: str) -> int:
     )
 
 
-async def _get_red_yellow_items(session: AsyncSession) -> list[dict]:
-    """Query all schedule items with R or Y status, joined with houses and latest event."""
+async def _get_red_yellow_items(session: AsyncSession, filter_status: str | None = None) -> list[dict]:
+    """Query schedule items with R or Y status, optionally filtered to one status.
+    
+    When filter_status is 'R' or 'Y', only items with that status are returned.
+    When None, all R and Y items are returned.
+    """
+    statuses = ["R", "Y"]
+    if filter_status in ("R", "Y"):
+        statuses = [filter_status]
+    
     stmt = (
         select(ScheduleItem)
         .options(selectinload(ScheduleItem.house))
-        .where(ScheduleItem.andon_status.in_(["R", "Y"]))
+        .where(ScheduleItem.andon_status.in_(statuses))
         .order_by(ScheduleItem.last_touch_ts.asc().nullslast())
     )
     result = await session.execute(stmt)
@@ -499,19 +507,21 @@ async def _log_action(
     )
 
 
-async def _render_rows(session: AsyncSession) -> str:
-    """Render just the house rows partial."""
-    items = await _get_red_yellow_items(session)
+async def _render_rows(session: AsyncSession, filter_status: str | None = None) -> str:
+    """Render just the house rows partial, optionally filtered by status (R or Y)."""
+    items = await _get_red_yellow_items(session, filter_status)
     return _render("partials/house_rows.html", items=items)
+
 
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(
     request: Request,
     session: AsyncSession = Depends(get_db),
     user: dict = Depends(require_admin),
+    filter: str = Query("", alias="f"),
 ):
     """Render the full dashboard page."""
-    items = await _get_red_yellow_items(session)
+    items = await _get_red_yellow_items(session, filter or None)
     today = date.today().strftime("%B %d, %Y")
     red_count = sum(1 for i in items if i["andon_status"] == "R")
     yellow_count = sum(1 for i in items if i["andon_status"] == "Y")
@@ -530,6 +540,7 @@ async def dashboard_page(
         yellow_count=yellow_count,
         company_name=company_name,
         user=user,
+        active_filter=filter or "",
     )
     return HTMLResponse(html)
 
@@ -539,9 +550,10 @@ async def dashboard_partial(
     request: Request,
     session: AsyncSession = Depends(get_db),
     user: dict = Depends(require_admin),
+    filter: str = Query("", alias="f"),
 ):
-    """HTMX partial — returns the house rows partial (no escalation banners)."""
-    rows_html = await _render_rows(session)
+    """HTMX partial — returns the house rows partial, optionally filtered."""
+    rows_html = await _render_rows(session, filter or None)
     return HTMLResponse(rows_html)
 
 
