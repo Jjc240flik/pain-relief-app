@@ -16,9 +16,9 @@
   <div class="p-4 sm:p-5">
 
     <!-- Row header: dot + trade + badge -->
-    <div class="flex items-start justify-between gap-2 mb-1">
+    <div class="flex items-center justify-between gap-2 mb-1">
       <div class="min-w-0 flex-1 flex items-center gap-2">
-        <span class="shrink-0 w-2.5 h-2.5 rounded-full mt-0.5 {% if item.andon_status == 'R' %}bg-red-500{% else %}bg-yellow-400{% endif %}"></span>
+        <span class="shrink-0 w-2.5 h-2.5 rounded-full {% if item.andon_status == 'R' %}bg-red-500{% else %}bg-yellow-400{% endif %}"></span>
         <div>
           <h3 class="font-semibold text-gray-900 text-base">{{ item.trade_display }}</h3>
           <p class="text-sm text-gray-500 truncate">
@@ -61,24 +61,21 @@
     </div>
     {% endif %}
 
-    <!-- Meta: activity + timestamp on left, time_ago on right -->
-    <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-400 mb-3">
-      <div class="flex flex-wrap items-center gap-2">
-        {% if item.activity_label %}<span class="text-gray-500 font-medium">{{ item.activity_label }}</span>{% endif %}
-        {% if item.trade_note %}<span class="italic">{{ item.trade_note }}</span>{% endif %}
-        {% if item.delegation_status %}
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
-                     {% if item.delegation_status == 'delegated' %}bg-blue-100 text-blue-700
-                     {% elif item.delegation_status == 'in_progress' %}bg-yellow-100 text-yellow-700
-                     {% elif item.delegation_status == 'resolved' %}bg-green-100 text-green-700{% endif %}">
-          👥 {{ item.delegated_to }} ({{ item.delegation_status|replace('_', ' ')|title }})
-        </span>
-        {% endif %}
-      </div>
-      {% if item.time_ago %}<span class="shrink-0">{{ item.time_ago }}</span>{% endif %}
+    <!-- Meta: activity + timestamp on left -->
+    <div class="flex flex-wrap items-center gap-2 text-xs text-gray-400 mb-1">
+      {% if item.activity_label %}<span class="text-gray-500 font-medium">{{ item.activity_label }}</span>{% endif %}
+      {% if item.trade_note %}<span class="italic">{{ item.trade_note }}</span>{% endif %}
+      {% if item.delegation_status %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
+                   {% if item.delegation_status == 'delegated' %}bg-blue-100 text-blue-700
+                   {% elif item.delegation_status == 'in_progress' %}bg-yellow-100 text-yellow-700
+                   {% elif item.delegation_status == 'resolved' %}bg-green-100 text-green-700{% endif %}">
+        👥 {{ item.delegated_to }} ({{ item.delegation_status|replace('_', ' ')|title }})
+      </span>
+      {% endif %}
     </div>
 
-    <!-- Actions -->
+    <!-- Actions row with time_ago -->
     <div class="flex flex-wrap items-center gap-1.5">
       <button hx-post="/dashboard/{{ item.id }}/resolve"
               hx-target="#house-list" hx-swap="innerHTML swap:0.3s"
@@ -103,6 +100,7 @@
                      bg-gray-50 text-gray-600 hover:bg-gray-100">
         📅 Date
       </button>
+      {% if item.time_ago %}<span class="text-[10px] text-gray-400 ml-1">{{ item.time_ago }}</span>{% endif %}
       {% if item.sub_phone %}
       <div class="relative inline-block contact-dropdown">
         <button onclick="toggleDropdown(event, 'dd-{{ item.id }}')"
