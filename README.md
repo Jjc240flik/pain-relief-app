@@ -1,121 +1,205 @@
-# TLG Andon — SMS-Powered Issue Tracking for Home Builders
+# TLG Andon
 
-A real-time issue tracking system designed for home builders. Subcontractors report problems via **SMS**, **Email**, or **Voice**, and the system classifies them, alerts the Project Manager, and tracks resolution — all without requiring anyone to install an app.
+TLG Andon is a flow-intelligence and issue-orchestration platform for residential builders managing multiple active homes.
+
+Subcontractors and field personnel report updates through familiar channels such as SMS, MMS, email, voicemail, or manual entry. The backend converts those inputs into structured construction events, evaluates schedule impact, and shows project managers only the Yellow and Red exceptions requiring attention.
+
+The system does not require subcontractors to install an app.
+
+## Product Position
+
+TLG Andon is not a replacement for Buildertrend, JobTread, Procore, or another system of record.
+
+It is a **system of attention** that can sit beside or integrate with existing contractor platforms.
+
+## Core Flow
+
+```text
+SMS / MMS / Email / Voice / Manual / Integration
+                        ↓
+               Raw Intake + Audit Log
+                        ↓
+             Keyword / Phrase Classifier
+                        ↓
+              AI Interpretation if Needed
+                        ↓
+             Structured Construction Event
+                        ↓
+          Schedule Context + Dependency Rules
+                        ↓
+                    Flow Grade
+                        ↓
+             Yellow / Red Dashboard Card
+                        ↓
+          Resolve / Date / Call / Delegate
+```
 
 ## Architecture
 
-```
-andon/                          # Main application
+```text
+andon/
 ├── app/
-│   ├── api/                    # Admin & public API routes
-│   │   ├── admin.py            # Analytics, scorecard, contacts, alerts, keyword import
-│   │   ├── seed.py             # Seed data generation
-│   │   └── schedule.py         # Schedule management
-│   ├── models/                 # SQLAlchemy ORM models
-│   │   ├── contact.py          # Subcontractor contacts
-│   │   ├── event.py            # Immutable event log (SMS, Email, Voice, MMS)
-│   │   ├── house.py            # House/project data
-│   │   └── schedule_item.py    # Per-trade schedule items with andon status
-│   ├── repositories/           # Data access layer
-│   ├── services/               # Business logic
-│   │   ├── classifier.py       # ClassifierEngine v3 (trade-aware, keyword-based)
-│   │   ├── inbound.py          # Inbound message processor
-│   │   ├── keyword_loader.py   # Graded keyword import from Excel
-│   │   ├── media_store.py      # Download & store MMS media (S3 or local)
-│   │   ├── outbound.py         # Outbound message sender
-│   │   ├── scheduler.py        # Automated check-in scheduler
-│   │   └── transcriber.py      # Voice transcription via OpenAI Whisper
-│   ├── templates/              # Jinja2 templates
-│   │   ├── admin/              # Analytics, alerts, scorecard, contacts
-│   │   ├── onboarding/         # New-user setup wizard
-│   │   └── partials/           # HTMX partials (dashboard cards)
-│   ├── views/                  # Dashboard + onboarding routes
-│   │   ├── dashboard.py        # Main dashboard with cards
-│   │   └── onboarding.py       # New-client onboarding wizard
-│   └── webhooks/               # Inbound webhook handlers
-│       ├── twilio.py           # SMS, MMS, Voice
-│       └── sendgrid.py         # Email
+│   ├── api/
+│   │   ├── admin.py
+│   │   ├── contacts.py
+│   │   ├── projects.py
+│   │   ├── schedule.py
+│   │   ├── integrations.py
+│   │   └── seed.py
+│   ├── models/
+│   │   ├── project.py
+│   │   ├── project_contact.py
+│   │   ├── contact.py
+│   │   ├── trade_schedule_item.py
+│   │   ├── inbound_message.py
+│   │   ├── construction_event.py
+│   │   ├── grading_result.py
+│   │   ├── issue_card.py
+│   │   ├── manager_override.py
+│   │   ├── resolution.py
+│   │   └── outbound_message.py
+│   ├── repositories/
+│   ├── services/
+│   │   ├── intake.py
+│   │   ├── context_resolver.py
+│   │   ├── keyword_classifier.py
+│   │   ├── ai_interpreter.py
+│   │   ├── flow_engine.py
+│   │   ├── card_generator.py
+│   │   ├── date_engine.py
+│   │   ├── contact_router.py
+│   │   ├── outbound.py
+│   │   ├── scheduler.py
+│   │   ├── transcriber.py
+│   │   ├── media_store.py
+│   │   └── audit.py
+│   ├── templates/
+│   │   ├── dashboard/
+│   │   ├── contacts/
+│   │   ├── projects/
+│   │   ├── onboarding/
+│   │   └── partials/
+│   ├── views/
+│   │   ├── dashboard.py
+│   │   ├── contacts.py
+│   │   ├── projects.py
+│   │   └── onboarding.py
+│   └── webhooks/
+│       ├── plivo.py
+│       ├── email.py
+│       └── integrations.py
 ├── docs/
+│   ├── PRD.md
+│   ├── TECH_SPEC.md
 │   └── admin-monitoring-system.md
-├── keywords_and_phrases.md           # Keyword reference (markdown)
-├── keywords_and_phrases_checklist.xlsx # Graded keyword Excel
-├── keywords_rules.json                # Classifier graded rules
-├── alerts_config.json                 # Usage alert thresholds
-├── escalation_config.json             # Escalation group config
-├── docker-compose.yml                 # PostgreSQL + app
-├── pyproject.toml                     # Python dependencies
-└── New_Features.md                    # Feature backlog (active + completed)
+├── keywords_and_phrases_checklist.xlsx
+├── keyword_rules.json
+├── escalation_config.json
+├── docker-compose.yml
+└── pyproject.toml
 ```
 
 ## Key Features
 
-### Ingest (Multi-Channel)
-- **SMS** — Twilio webhook, structured reply detection (1=Yes, 2=No, 3=Issue)
-- **MMS** — Up to 5 photos + video per message, gallery modal
-- **Email** — SendGrid Inbound Parse, sender resolution by email
-- **Voice** — Voicemail recording + Whisper transcription
+### Multi-Channel Intake
+- SMS through Plivo
+- MMS photos and media
+- Email inbound parsing
+- Voicemail and voice-note transcription
+- Manual PM entry
+- Future integration webhooks
 
-### Classification (ClassifierEngine v3)
-- Trade-aware severity matrix (1.3–0.85 multipliers)
-- Multi-hit scoring (3+ Yellow keywords → Red upgrade)
-- Graded keyword import from Excel (420 terms across 10 trades)
-- Option B+C behind detection (check-in verification + history tracking)
-- Feedback widget for PM corrections (logged for future retraining)
+### Project Onboarding
+- Add Project beside Add Contact
+- Estimated Start and Target Start
+- Optional trade schedule
+- Project-specific contacts
+- Partial schedule support
+- Schedule maturity tracking
+
+### Classification
+- Existing graded keyword and phrase library
+- Trade-aware matching
+- Simple reply bypass
+- AI interpretation for free-form or ambiguous language
+- Separate Language Grade and Flow Grade
+- Manager override and feedback logging
+
+### Flow Engine
+- Uses project schedule maturity
+- Evaluates target and confirmed dates
+- Checks downstream trades and inspections
+- Applies deterministic rules
+- Produces explainable Yellow and Red outcomes
 
 ### Dashboard
-- Real-time card view sorted oldest-first
-- Activity labels (Onsite, Behind, Issue Reported, Message Received)
-- Quick actions: Resolve, +1/+3 Days, Date picker, Call (sub/boss/email), Delegate, Escalate
-- Contextual trade-specific actions (Check Truss, Call Supplier, Flag Cleanup, etc.)
-- Inline classification correction (R/Y/G picker with optional comment)
-- Media gallery (photos) + video player
-- Escalation banners (time-based, multi-Red, keyword-triggered)
+- Yellow and Red cards only by default
+- Oldest unresolved cards first
+- City, address, trade, issue, impact, and age
+- Resolve, Date, Call, Delegate
+- Media playback and message source
+- No extra front-end controls for backend intelligence
 
-### Admin Tools
-- **Analytics** — Usage metrics, cost estimates, issue insights, system health
-- **Alerts** — Configurable thresholds for spend, volume, storage
-- **Scorecard** — Per-subcontractor performance metrics
-- **Contacts** — CRUD + CSV import
-- **Onboarding** — New-user wizard with template download
+### Integrations
+- Public API-ready design
+- Webhook intake and outbound events
+- Future Zapier support
+- Future Buildertrend, JobTread, Procore, Contractor Foreman, Fieldwire, and calendar connectors
+
+## Technology Stack
+
+- Python 3.12
+- FastAPI
+- PostgreSQL 16
+- SQLAlchemy 2.x
+- Alembic
+- Jinja2
+- HTMX
+- Tailwind CSS
+- Plivo Messaging and Voice
+- OpenAI transcription / language interpretation
+- OpenPyXL
+- Object storage for media
+- Background job queue
 
 ## Quick Start
 
 ```bash
 cd andon
-cp .env.example .env        # Edit with your Twilio/SendGrid/OpenAI keys
-docker compose up -d        # Start PostgreSQL
+cp .env.example .env
+docker compose up -d
 source .venv/bin/activate
+alembic upgrade head
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-### Seed Data
-```bash
-curl -X POST http://localhost:8000/api/seed
-```
-
-### Routes
+## Core Routes
 
 | Path | Purpose |
 |---|---|
-| `/dashboard` | Main PM dashboard |
-| `/onboarding` | New-client setup wizard |
-| `/admin/analytics` | Usage & cost analytics |
-| `/admin/alerts` | Alert configuration |
-| `/admin/scorecard` | Subcontractor scorecard |
-| `/admin/contacts` | Contact management |
-| `/admin/import-keywords` | Import graded Excel keywords |
-| `/webhooks/twilio/sms` | Twilio SMS/MMS inbound |
-| `/webhooks/twilio/voice` | Twilio Voice inbound |
-| `/webhooks/twilio/recording` | Twilio recording callback |
-| `/webhooks/sendgrid/inbound` | SendGrid email inbound |
+| `/dashboard` | Daily Yellow/Red attention view |
+| `/projects` | Project list and administration |
+| `/projects/new` | Add Project onboarding |
+| `/contacts` | Contact management |
+| `/contacts/new` | Add Contact |
+| `/admin/analytics` | Usage, classification, and cost analytics |
+| `/admin/alerts` | Alert and escalation configuration |
+| `/admin/scorecard` | Subcontractor metrics |
+| `/admin/import-keywords` | Import graded keyword file |
+| `/webhooks/plivo/message` | Inbound SMS/MMS |
+| `/webhooks/plivo/voice` | Inbound voice |
+| `/webhooks/plivo/recording` | Recording callback |
+| `/webhooks/email/inbound` | Inbound email |
+| `/webhooks/integrations/{source}` | Future integration intake |
+| `/api/v1/projects` | Project API |
+| `/api/v1/events` | Event API |
+| `/api/v1/cards` | Card API |
 
-## Tech Stack
+## Build Philosophy
 
-- **Python 3.12** + **FastAPI** — Backend
-- **PostgreSQL 16** — Database
-- **Jinja2** + **HTMX** + **Tailwind CSS** — Frontend
-- **Twilio** — SMS, MMS, Voice
-- **SendGrid** — Email inbound
-- **OpenAI Whisper** — Voice transcription
-- **OpenPyXL** — Excel file processing
-- **SQLAlchemy** — ORM
+- Cards are temporary; events are permanent
+- AI translates; deterministic rules decide
+- Missing schedules produce conservative grading
+- Confirmed dates are never silently changed
+- The frontend remains simple even as the backend becomes more capable
+- Integrations should reduce duplicate work, not create another platform burden
