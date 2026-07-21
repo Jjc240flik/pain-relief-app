@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Flow Impact Engine — Classification Output",
+  "description": "Standardized output from the classification engine for construction operations events.",
+  "type": "object",
+  "required": [
+    "project", "source", "schedule", "event", "impact",
+    "classification", "recommended_action", "foreman_card"
+  ],
+  "properties": {
+    "project": {
+      "type": "object",
+      "properties": {
+        "name":             {"type": "string"},
+        "lot_number":       {"type": "string"},
+        "address":          {"type": "string"},
+        "city":             {"type": "string"},
+        "state":            {"type": "string"},
+        "project_status":   {"type": "string"},
+        "current_phase":    {"type": "string"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "type":         {"type": "string", "enum": ["sms", "voice_note", "photo", "email", "manual", "integration"]},
+        "sender_name":  {"type": "string"},
+        "sender_role":  {"type": "string"},
+        "sender_trade": {"type": "string"}
+      }
+    },
+    "schedule": {
+      "type": "object",
+      "properties": {
+        "schedule_maturity":          {"type": "string", "enum": ["full_schedule", "partial_schedule", "estimated_only", "target_schedule", "no_schedule"]},
+        "estimated_project_start_date": {"type": ["string", "null"]},
+        "target_project_start_date":    {"type": ["string", "null"]},
+        "estimated_completion_date":    {"type": ["string", "null"]},
+        "target_completion_date":       {"type": ["string", "null"]},
+        "operative_date":               {"type": ["string", "null"]},
+        "operative_date_type":          {"type": "string", "enum": ["actual", "confirmed", "target", "estimated", "none"]},
+        "date_reliability":             {"type": "string", "enum": ["actual", "confirmed", "operational_target", "planning_estimate", "unknown"]}
+      }
+    },
+    "event": {
+      "type": "object",
+      "properties": {
+        "event_type":   {"type": "string"},
+        "trade":        {"type": "string"},
+        "summary":      {"type": "string"},
+        "reason":       {"type": "string"},
+        "original_date": {"type": ["string", "null"]},
+        "revised_date":  {"type": ["string", "null"]},
+        "certainty":    {"type": "string", "enum": ["confirmed", "likely", "possible", "unclear"]}
+      }
+    },
+    "impact": {
+      "type": "object",
+      "properties": {
+        "production_blocked":    {"type": "boolean"},
+        "affected_trade":        {"type": ["string", "null"]},
+        "affected_inspection":   {"type": ["string", "null"]},
+        "affected_deadline":     {"type": ["string", "null"]},
+        "downstream_impact":     {"type": "string"},
+        "time_until_impact_hours": {"type": ["number", "null"]},
+        "available_float_hours":   {"type": ["number", "null"]}
+      }
+    },
+    "classification": {
+      "type": "object",
+      "properties": {
+        "status":             {"type": "string", "enum": ["green", "yellow", "red"]},
+        "card_required":      {"type": "boolean"},
+        "reason_for_status":  {"type": "string"},
+        "confidence_score":   {"type": "number", "minimum": 0, "maximum": 1},
+        "grading_rule_used":  {"type": "string"}
+      }
+    },
+    "recommended_action": {
+      "type": "object",
+      "properties": {
+        "primary_action":       {"type": "string"},
+        "contact_name":         {"type": "string"},
+        "contact_role":         {"type": "string"},
+        "contact_phone":        {"type": "string"},
+        "contact_email":        {"type": "string"},
+        "suggested_date_change": {"type": ["string", "null"]},
+        "date_change_scope":    {"type": "string", "enum": ["no_date_change", "change_this_trade_only", "change_this_trade_and_next_trade", "cascade_selected_trades", "manual_review_required"]},
+        "cascade_date_change":  {"type": "boolean"},
+        "affected_trades":      {"type": "array", "items": {"type": "string"}},
+        "suggested_notifications": {"type": "array", "items": {"type": "string"}},
+        "follow_up_deadline":   {"type": ["string", "null"]},
+        "manager_approval_required": {"type": "boolean"}
+      }
+    },
+    "missing_information": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "clarification_question": {
+      "type": ["string", "null"]
+    },
+    "foreman_card": {
+      "type": "object",
+      "properties": {
+        "title":                    {"type": "string"},
+        "subtitle":                 {"type": "string"},
+        "issue_summary":            {"type": "string"},
+        "impact_summary":           {"type": "string"},
+        "recommended_action_text":  {"type": "string"}
+      }
+    }
+  }
+}
