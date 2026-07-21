@@ -158,7 +158,10 @@
       </div>
       {% endif %}
       <!-- Delegate button -->
-      <button onclick="openDelegateModal('{{ item.id }}', '{{ item.trade_display | e }}', '{{ (item.sub_name or '') | e }}')"
+      <button onclick="openDelegateModal(this)"
+              data-item-id="{{ item.id }}"
+              data-trade="{{ item.trade_display | e }}"
+              data-boss="{{ item.sub_name or '' }}"
               class="px-3 py-1.5 text-xs font-medium rounded-lg transition
                      bg-teal-50 text-teal-700 hover:bg-teal-100">
         👥 Delegate

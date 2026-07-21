@@ -574,10 +574,13 @@ function cancelCorrection(itemId) {
 }
 
 // ── Delegation ──
-function openDelegateModal(itemId, tradeName, bossName) {
+function openDelegateModal(btn) {
+  var itemId = btn.getAttribute('data-item-id');
+  var tradeName = btn.getAttribute('data-trade') || '';
+  var bossName = btn.getAttribute('data-boss') || 'manager';
   document.getElementById('delegate-item-id').value = itemId;
-  document.getElementById('delegate-trade').value = tradeName || '';
-  document.getElementById('delegate-boss-name').textContent = bossName || 'manager';
+  document.getElementById('delegate-trade').value = tradeName;
+  document.getElementById('delegate-boss-name').textContent = bossName;
   document.getElementById('delegate-modal').style.display = 'flex';
   var checkboxes = document.querySelectorAll('#delegate-form input[type="checkbox"]');
   for (var i = 0; i < checkboxes.length; i++) { checkboxes[i].checked = false; }
@@ -605,7 +608,8 @@ function submitDelegate() {
 
 // ── Contextual actions ──
 function prefillDelegationNote(itemId, note) {
-  openDelegateModal(itemId);
+  var btn = document.querySelector('#row-' + itemId + ' [data-item-id="' + itemId + '"]');
+  if (btn) openDelegateModal(btn);
   document.getElementById('delegate-note').value = note;
 }
 </script>
