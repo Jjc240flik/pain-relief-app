@@ -6,6 +6,9 @@ class Settings(BaseSettings):
     twilio_account_sid: str | None = None
     twilio_auth_token: str | None = None
     twilio_phone_number: str | None = None
+    plivo_auth_id: str | None = None
+    plivo_auth_token: str | None = None
+    plivo_phone_number: str | None = None
     openai_api_key: str | None = None
     designer_phone_number: str | None = None
     jim_phone_number: str | None = None

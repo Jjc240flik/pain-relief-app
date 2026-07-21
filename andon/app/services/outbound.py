@@ -24,17 +24,35 @@ class RateLimitError(Exception):
 
 
 class OutboundService:
-    """Handles all outbound SMS traffic with quiet hours and rate limiting."""
+    """Handles all outbound SMS traffic with quiet hours and rate limiting.
+
+    Supports Twilio (default) and Plivo as providers.
+    Plivo is used when plivo_auth_id is configured; otherwise falls back to Twilio.
+    """
 
     def __init__(self) -> None:
         self._twilio: TwilioClient | None = None
-        if settings.twilio_account_sid and settings.twilio_auth_token:
+        self._plivo = None
+        self._provider = "log"
+
+        # Prefer Plivo
+        if settings.plivo_auth_id and settings.plivo_auth_token:
+            import plivo
+            self._plivo = plivo.RestClient(
+                auth_id=settings.plivo_auth_id,
+                auth_token=settings.plivo_auth_token,
+            )
+            self._provider = "plivo"
+            logger.info("Outbound SMS provider: Plivo")
+        elif settings.twilio_account_sid and settings.twilio_auth_token:
             self._twilio = TwilioClient(
                 settings.twilio_account_sid,
                 settings.twilio_auth_token,
             )
+            self._provider = "twilio"
+            logger.info("Outbound SMS provider: Twilio")
         else:
-            logger.warning("Twilio credentials not configured — SMS sending disabled.")
+            logger.warning("No SMS provider configured — SMS sending disabled.")
 
     # ------------------------------------------------------------------
     # Public API
@@ -74,28 +92,41 @@ class OutboundService:
                 f"Rate limit exceeded for house={house_id} trade={trade} today"
             )
 
-        # --- Send via Twilio (or log in dev mode) ---
-        if self._twilio is None:
-            logger.info(
-                "[DEV] Would send SMS to %s: %s", to_phone, body,
-            )
-            # Still log the event
+        # --- Send via configured provider ---
+        if self._provider == "log":
+            logger.info("[DEV] Would send SMS to %s: %s", to_phone, body)
             await self._log_event(to_phone, body, house_id, trade)
             return True
 
-        try:
-            message = self._twilio.messages.create(
-                body=body,
-                from_=settings.twilio_phone_number,
-                to=to_phone,
-            )
-            logger.info("SMS sent: sid=%s to=%s", message.sid, to_phone)
-            await self._log_event(to_phone, body, house_id, trade)
-            return True
+        if self._provider == "plivo":
+            try:
+                response = self._plivo.messages.create(
+                    src=settings.plivo_phone_number,
+                    dst=to_phone,
+                    text=body,
+                )
+                logger.info("Plivo SMS sent: uuid=%s to=%s", response.message_uuid, to_phone)
+                await self._log_event(to_phone, body, house_id, trade)
+                return True
+            except Exception as exc:
+                logger.error("Plivo send failed: %s", exc)
+                return False
 
-        except TwilioRestException as exc:
-            logger.error("Twilio send failed: %s", exc)
-            return False
+        if self._provider == "twilio":
+            try:
+                message = self._twilio.messages.create(
+                    body=body,
+                    from_=settings.twilio_phone_number,
+                    to=to_phone,
+                )
+                logger.info("Twilio SMS sent: sid=%s to=%s", message.sid, to_phone)
+                await self._log_event(to_phone, body, house_id, trade)
+                return True
+            except TwilioRestException as exc:
+                logger.error("Twilio send failed: %s", exc)
+                return False
+
+        return False
 
     # ------------------------------------------------------------------
     # Readiness / Day-Before / Completion messages (convenience methods)
