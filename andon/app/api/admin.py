@@ -664,3 +664,182 @@ async def admin_subscribers_summary(
     html = _render("admin/subscribers_summary.html",
         request=request, total=total, paid=paid, active=active, by_state=by_state, user=user)
     return HTMLResponse(html)
+
+
+# ── Project Onboarding ──
+
+@router.get("/projects", response_class=HTMLResponse)
+async def admin_projects_list(
+    request: Request,
+    user: dict = Depends(require_admin),
+):
+    """List all projects."""
+    from sqlalchemy import text as sql_text
+    async with async_session() as session:
+        rows = (await session.execute(sql_text(
+            "SELECT id, project_name, street_address, city, state, project_status, "
+            "estimated_start, target_start, schedule_maturity, created_at "
+            "FROM projects ORDER BY created_at DESC"
+        ))).fetchall()
+    html = _render("admin/projects_list.html", request=request, projects=rows, user=user)
+    return HTMLResponse(html)
+
+
+@router.get("/projects/new", response_class=HTMLResponse)
+async def admin_project_new(
+    request: Request,
+    user: dict = Depends(require_admin),
+):
+    """Render the multi-section project onboarding form."""
+    from sqlalchemy import text as sql_text
+    async with async_session() as session:
+        contacts = (await session.execute(sql_text(
+            "SELECT id, name, company, trade, phone, email FROM contacts ORDER BY name"
+        ))).fetchall()
+    html = _render("admin/project_new.html",
+        request=request, user=user,
+        contacts=contacts, trade_labels=TRADE_LABELS,
+    )
+    return HTMLResponse(html)
+
+
+@router.post("/projects/new", response_class=HTMLResponse)
+async def admin_project_create(request: Request, user: dict = Depends(require_admin)):
+    """Save a new project from the onboarding form."""
+    from sqlalchemy import text as sql_text
+    from datetime import date
+    form = await request.form()
+
+    project_name = (form.get("project_name") or "").strip()
+    street_address = (form.get("street_address") or "").strip()
+    if not project_name or not street_address:
+        return HTMLResponse("Project name and address required", status_code=400)
+
+    city = (form.get("city") or "").strip()
+    state = (form.get("state") or "").strip()
+    zip_code = (form.get("zip_code") or "").strip()
+    community = (form.get("community") or "").strip()
+    internal_number = (form.get("internal_number") or "").strip()
+    owner_name = (form.get("owner_name") or "").strip()
+    superintendent = (form.get("superintendent") or "").strip()
+    project_manager = (form.get("project_manager") or "").strip()
+    notes = (form.get("notes") or "").strip()
+    project_status = (form.get("project_status") or "planning").strip()
+    current_phase = (form.get("current_phase") or "").strip()
+    current_trade = (form.get("current_trade") or "").strip()
+    next_planned = (form.get("next_planned_trade") or "").strip()
+
+    estimated_start = form.get("estimated_start") or None
+    target_start = form.get("target_start") or None
+    estimated_completion = form.get("estimated_completion") or None
+    target_completion = form.get("target_completion") or None
+
+    # Determine schedule maturity
+    has_target = bool(target_start or target_completion)
+    has_estimated = bool(estimated_start or estimated_completion)
+    if has_target:
+        maturity = "target_schedule"
+    elif has_estimated:
+        maturity = "estimated_only"
+    else:
+        maturity = "no_schedule"
+
+    async with async_session() as session:
+        subscriber_id = (await session.execute(
+            sql_text("SELECT id FROM subscribers LIMIT 1")
+        )).scalar()
+        proj = (await session.execute(sql_text(
+            """INSERT INTO projects (subscriber_id, project_name, street_address, city, state, zip_code,
+               community, internal_number, owner_name, assigned_superintendent, assigned_project_manager,
+               notes, project_status, current_phase, current_trade, next_planned_trade,
+               estimated_start, target_start, estimated_completion, target_completion,
+               schedule_maturity)
+               VALUES (:sub, :name, :addr, :city, :st, :zip, :comm, :intn, :own, :supe, :pm,
+               :notes, :pstat, :phase, :trade, :next, :estart, :tstart, :ecomp, :tcomp, :mat)
+               RETURNING id"""),
+            {"sub": subscriber_id, "name": project_name, "addr": street_address,
+             "city": city, "st": state, "zip": zip_code, "comm": community,
+             "intn": internal_number, "own": owner_name, "supe": superintendent,
+             "pm": project_manager, "notes": notes, "pstat": project_status,
+             "phase": current_phase, "trade": current_trade, "next": next_planned,
+             "estart": estimated_start, "tstart": target_start,
+             "ecomp": estimated_completion, "tcomp": target_completion,
+             "mat": maturity}
+        ))
+        project_id = proj.fetchone()[0]
+
+        # Link selected contacts
+        selected_contact_ids = form.getlist("contact_id")
+        selected_roles = form.getlist("contact_role")
+        for i, cid in enumerate(selected_contact_ids):
+            if cid.strip():
+                role = selected_roles[i].strip() if i < len(selected_roles) else ""
+                await session.execute(sql_text(
+                    "INSERT INTO project_contacts (project_id, contact_id, role) VALUES (:pid, :cid, :role)"
+                ), {"pid": project_id, "cid": cid.strip(), "role": role})
+
+        # Save trade schedule rows
+        trade_names = form.getlist("trade_name")
+        trade_contacts = form.getlist("trade_contact_id")
+        trade_estarts = form.getlist("trade_estimated_start")
+        trade_tstarts = form.getlist("trade_target_start")
+        trade_durations = form.getlist("trade_duration")
+        trade_tcomps = form.getlist("trade_target_completion")
+        trade_preceding = form.getlist("trade_preceding")
+        trade_inspections = form.getlist("trade_inspection")
+        trade_critical = form.getlist("trade_critical")
+        trade_notes = form.getlist("trade_notes")
+
+        for i, tn in enumerate(trade_names):
+            tn = tn.strip()
+            if not tn:
+                continue
+            insp = (trade_inspections[i].strip() if i < len(trade_inspections) else "") == "on"
+            crit = (trade_critical[i].strip() if i < len(trade_critical) else "") == "on"
+            dur_str = trade_durations[i].strip() if i < len(trade_durations) else ""
+            await session.execute(sql_text(
+                """INSERT INTO project_trades (project_id, trade, assigned_contact_id,
+                   estimated_start, target_start, estimated_duration_days,
+                   target_completion, preceding_trade, inspection_required,
+                   critical_path, notes, schedule_status)
+                   VALUES (:pid, :trade, :cid, :est, :tgt, :dur, :tcomp, :prec, :insp, :crit, :notes, 'estimated')"""),
+                {"pid": project_id, "trade": tn,
+                 "cid": trade_contacts[i].strip() if i < len(trade_contacts) and trade_contacts[i].strip() else None,
+                 "est": trade_estarts[i].strip() if i < len(trade_estarts) else None,
+                 "tgt": trade_tstarts[i].strip() if i < len(trade_tstarts) else None,
+                 "dur": int(dur_str) if dur_str else None,
+                 "tcomp": trade_tcomps[i].strip() if i < len(trade_tcomps) else None,
+                 "prec": trade_preceding[i].strip() if i < len(trade_preceding) else "",
+                 "insp": insp, "crit": crit,
+                 "notes": trade_notes[i].strip() if i < len(trade_notes) else ""})
+
+        await session.commit()
+
+    return HTMLResponse("", status_code=303, headers={"Location": f"/admin/projects/{project_id}"})
+
+
+@router.get("/projects/{project_id}", response_class=HTMLResponse)
+async def admin_project_view(
+    request: Request,
+    project_id: str,
+    user: dict = Depends(require_admin),
+):
+    """View a single project with details."""
+    from sqlalchemy import text as sql_text
+    async with async_session() as session:
+        proj = (await session.execute(sql_text(
+            "SELECT * FROM projects WHERE id = :id"
+        ), {"id": project_id})).fetchone()
+        if not proj:
+            return HTMLResponse("Project not found", status_code=404)
+        contacts = (await session.execute(sql_text(
+            "SELECT c.name, c.company, c.trade, c.phone, c.email, pc.role "
+            "FROM project_contacts pc JOIN contacts c ON pc.contact_id = c.id "
+            "WHERE pc.project_id = :pid ORDER BY pc.assigned_at"
+        ), {"pid": project_id})).fetchall()
+        trades = (await session.execute(sql_text(
+            "SELECT * FROM project_trades WHERE project_id = :pid ORDER BY trade"
+        ), {"pid": project_id})).fetchall()
+    html = _render("admin/project_view.html",
+        request=request, proj=proj, contacts=contacts, trades=trades, user=user)
+    return HTMLResponse(html)

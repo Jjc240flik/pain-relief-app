@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}{{ proj.project_name }} — Project{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+  <div class="mb-6">
+    <a href="/admin/projects" class="text-sm text-blue-600 hover:text-blue-800">← All Projects</a>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+    <div class="flex items-start justify-between gap-3 mb-4">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">{{ proj.project_name }}</h1>
+        <p class="text-gray-500">{{ proj.street_address }}{% if proj.city %}, {{ proj.city }}{% endif %}{% if proj.state %}, {{ proj.state }}{% endif %}</p>
+      </div>
+      <span class="shrink-0 inline-flex px-3 py-1 rounded-full text-sm font-medium
+        {% if proj.project_status == 'active' %}bg-green-100 text-green-700
+        {% elif proj.project_status == 'planning' %}bg-blue-100 text-blue-700
+        {% elif proj.project_status == 'preparing' %}bg-yellow-100 text-yellow-700
+        {% elif proj.project_status == 'on_hold' %}bg-red-100 text-red-700
+        {% else %}bg-gray-100 text-gray-500{% endif %}">
+        {{ proj.project_status|replace('_', ' ')|title }}
+      </span>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+      {% if proj.estimated_start %}<div><span class="text-gray-400">Est. Start</span><br><span class="font-medium">{{ proj.estimated_start }}</span></div>{% endif %}
+      {% if proj.target_start %}<div><span class="text-gray-400">Target Start</span><br><span class="font-medium">{{ proj.target_start }}</span></div>{% endif %}
+      {% if proj.estimated_completion %}<div><span class="text-gray-400">Est. Completion</span><br><span class="font-medium">{{ proj.estimated_completion }}</span></div>{% endif %}
+      {% if proj.target_completion %}<div><span class="text-gray-400">Target Completion</span><br><span class="font-medium">{{ proj.target_completion }}</span></div>{% endif %}
+    </div>
+
+    <div class="flex flex-wrap gap-4 text-xs text-gray-400">
+      <span>Schedule: {{ proj.schedule_maturity|replace('_', ' ') }}</span>
+      {% if proj.current_phase %}<span>Phase: {{ proj.current_phase }}</span>{% endif %}
+      {% if proj.current_trade %}<span>Trade: {{ proj.current_trade }}</span>{% endif %}
+      {% if proj.assigned_superintendent %}<span>Super: {{ proj.assigned_superintendent }}</span>{% endif %}
+      {% if proj.assigned_project_manager %}<span>PM: {{ proj.assigned_project_manager }}</span>{% endif %}
+    </div>
+  </div>
+
+  <!-- Assigned Contacts -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-3">Contacts ({{ contacts|length }})</h2>
+    {% if contacts %}
+    <div class="divide-y divide-gray-100">
+      {% for c in contacts %}
+      <div class="flex items-center justify-between py-2 text-sm">
+        <div>
+          <span class="font-medium text-gray-900">{{ c.name }}</span>
+          {% if c.company %} <span class="text-gray-400">— {{ c.company }}</span>{% endif %}
+        </div>
+        <div class="text-xs text-gray-500">
+          <span class="inline-flex px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">{{ c.role }}</span>
+          {% if c.trade %} <span class="ml-1 text-gray-400">{{ c.trade }}</span>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-400">No contacts assigned.</p>
+    {% endif %}
+  </div>
+
+  <!-- Trade Schedule -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-3">Trade Schedule ({{ trades|length }})</h2>
+    {% if trades %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="text-left px-3 py-2 font-medium text-gray-600">Trade</th>
+            <th class="text-left px-3 py-2 font-medium text-gray-600">Est. Start</th>
+            <th class="text-left px-3 py-2 font-medium text-gray-600">Target Start</th>
+            <th class="text-left px-3 py-2 font-medium text-gray-600">Duration</th>
+            <th class="text-left px-3 py-2 font-medium text-gray-600">Status</th>
+            <th class="text-center px-3 py-2 font-medium text-gray-600">Insp</th>
+            <th class="text-center px-3 py-2 font-medium text-gray-600">Critical</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for t in trades %}
+          <tr class="hover:bg-gray-50">
+            <td class="px-3 py-2 font-medium text-gray-900">{{ t.trade|replace('_', ' ')|title }}</td>
+            <td class="px-3 py-2 text-gray-600">{{ t.estimated_start or '—' }}</td>
+            <td class="px-3 py-2 text-gray-600">{{ t.target_start or '—' }}</td>
+            <td class="px-3 py-2 text-gray-600">{{ t.estimated_duration_days or '—' }}{% if t.estimated_duration_days %}d{% endif %}</td>
+            <td class="px-3 py-2">
+              <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium
+                {% if t.schedule_status == 'estimated' %}bg-gray-100 text-gray-600
+                {% elif t.schedule_status == 'targeted' %}bg-blue-100 text-blue-700
+                {% elif t.schedule_status == 'confirmed' %}bg-green-100 text-green-700
+                {% else %}bg-gray-100 text-gray-500{% endif %}">
+                {{ t.schedule_status }}
+              </span>
+            </td>
+            <td class="px-3 py-2 text-center">{% if t.inspection_required %}🔍{% endif %}</td>
+            <td class="px-3 py-2 text-center">{% if t.critical_path %}⭐{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-400">No trade schedule added yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
