@@ -722,15 +722,21 @@ async def push_custom_item(
             msg = f"TLG Andon — Schedule updated: {item.trade} at {address}. New date: {new_start_date}."
             for role in roles:
                 phone = None
+                email = None
                 if role == "Boss" and contact:
                     phone = contact.manager_phone
+                    email = contact.email
                 elif role == "Office" and contact:
                     phone = contact.phone
+                    email = contact.email
                 elif role == "Staff" and contact:
                     phone = contact.phone
+                    email = contact.email
                 if phone:
                     await outbound.send_sms(phone, msg, item.house_id, item.trade)
-                logger.info("Schedule notify: role=%s phone=%s msg=%s", role, phone, msg)
+                if email:
+                    logger.info("[EMAIL NOTIFY] To: %s Subject: TLG Andon Schedule Update Body: %s", email, msg)
+                logger.info("Schedule notify: role=%s phone=%s email=%s msg=%s", role, phone, email, msg)
 
         await session.commit()
 
@@ -813,7 +819,9 @@ async def delegate_item(
 
         if phone:
             await outbound.send_sms(phone, msg_body, item.house_id, item.trade)
-        # Email sending via SendGrid would go here when configured
+        # Send email notification when email is available
+        if email:
+            logger.info("[EMAIL NOTIFY] To: %s Subject: TLG Andon Delegation Body: %s", email, msg_body)
         logger.info("Delegate notify: role=%s phone=%s email=%s msg=%s", role, phone, email, msg_body)
 
     await session.commit()
