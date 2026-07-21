@@ -144,28 +144,48 @@ DEFAULT_RATES = {
 async def admin_analytics(
     request: Request,
     days: int = Query(30, alias="days", ge=1, le=365),
+    subscriber_id: str = Query("", alias="sub"),
     user: dict = Depends(require_owner),
 ):
-    """Render the admin analytics dashboard with usage, cost, and health metrics."""
+    """Render the admin analytics dashboard with usage, cost, and health metrics.
+
+    If subscriber_id is provided, filters by that subscriber.
+    Otherwise shows all subscribers combined.
+    """
     now = datetime.now(timezone.utc)
     since = now - timedelta(days=days)
     today = date.today()
 
     async with async_session() as session:
+        # Build subscriber filter
+        sub_filter = []
+        sub_name = "All Subscribers Combined"
+        if subscriber_id:
+            from sqlalchemy import text as sql_text
+            sub_row = (await session.execute(
+                sql_text("SELECT company_name FROM subscribers WHERE id = :id"),
+                {"id": subscriber_id}
+            )).fetchone()
+            if sub_row:
+                sub_name = sub_row[0]
+                sub_filter = [Event.subscriber_id == subscriber_id]
+
         # Usage
         channel_counts = defaultdict(int)
         stmt = select(Event.channel, Event.direction, func.count().label("c")).where(
-            Event.timestamp >= since).group_by(Event.channel, Event.direction)
+            Event.timestamp >= since, *sub_filter).group_by(Event.channel, Event.direction)
         for row in (await session.execute(stmt)):
             channel_counts[row.channel] += row.c
 
         mms_stmt = select(func.count()).select_from(Event).where(
-            Event.channel == "sms", Event.raw_payload.isnot(None), Event.timestamp >= since)
+            Event.channel == "sms", Event.raw_payload.isnot(None),
+            Event.timestamp >= since, *sub_filter)
         mms_count = (await session.execute(mms_stmt)).scalar() or 0
         voice_stmt = select(func.count()).select_from(Event).where(
-            Event.channel == "voice_message", Event.timestamp >= since)
+            Event.channel == "voice_message", Event.timestamp >= since, *sub_filter)
         voice_count = (await session.execute(voice_stmt)).scalar() or 0
-        total_stmt = select(func.count()).select_from(Event).where(Event.timestamp >= since)
+        total_stmt = select(func.count()).select_from(Event).where(
+            Event.timestamp >= since, *sub_filter)
         total_all = (await session.execute(total_stmt)).scalar() or 0
 
         usage = {
@@ -182,7 +202,7 @@ async def admin_analytics(
             d = {"date": ds.strftime("%b %d"), "sms": 0, "email": 0, "voice": 0}
             for row in (await session.execute(
                 select(Event.channel, func.count().label("c")).where(
-                    Event.timestamp >= ds, Event.timestamp < de).group_by(Event.channel))):
+                    Event.timestamp >= ds, Event.timestamp < de, *sub_filter).group_by(Event.channel))):
                 if row.channel == "sms": d["sms"] = row.c
                 elif row.channel == "email": d["email"] = row.c
                 elif row.channel == "voice_message": d["voice"] = row.c
@@ -206,14 +226,14 @@ async def admin_analytics(
         # Issue insights
         red = (await session.execute(
             select(func.count()).select_from(Event).where(
-                Event.outcome == "R", Event.timestamp >= since))).scalar() or 0
+                Event.outcome == "R", Event.timestamp >= since, *sub_filter))).scalar() or 0
         yellow = (await session.execute(
             select(func.count()).select_from(Event).where(
-                Event.outcome == "Y", Event.timestamp >= since))).scalar() or 0
+                Event.outcome == "Y", Event.timestamp >= since, *sub_filter))).scalar() or 0
         corr = (await session.execute(
             select(func.count()).select_from(Event).where(
                 Event.full_text.like("[CLASSIFICATION CORRECTION]%"),
-                Event.timestamp >= since))).scalar() or 0
+                Event.timestamp >= since, *sub_filter))).scalar() or 0
         total_cls = red + yellow
         issues = {
             "red": red, "yellow": yellow,
@@ -225,21 +245,22 @@ async def admin_analytics(
         trade_rows = (await session.execute(
             select(Event.trade, func.count().label("c")).where(
                 Event.outcome.isnot(None), Event.trade.isnot(None), Event.trade != "",
-                Event.timestamp >= since).group_by(Event.trade).order_by(desc("c")).limit(10)))
+                Event.timestamp >= since, *sub_filter
+            ).group_by(Event.trade).order_by(desc("c")).limit(10)))
         trade_breakdown = [{"trade": r.trade, "count": r.c} for r in trade_rows]
 
         # Top subs
         sub_rows = (await session.execute(
             select(Event.sender_phone, func.count().label("c")).where(
                 Event.outcome.isnot(None), Event.timestamp >= since,
-                Event.sender_phone.isnot(None)).group_by(Event.sender_phone)
-            .order_by(desc("c")).limit(10)))
+                Event.sender_phone.isnot(None), *sub_filter
+            ).group_by(Event.sender_phone).order_by(desc("c")).limit(10)))
         top_subs = [{"sender": r.sender_phone, "count": r.c} for r in sub_rows]
 
         # System health
         media_evt = (await session.execute(
             select(func.count()).select_from(Event).where(
-                Event.raw_payload.isnot(None), Event.timestamp >= since))).scalar() or 0
+                Event.raw_payload.isnot(None), Event.timestamp >= since, *sub_filter))).scalar() or 0
         sched_cnt = (await session.execute(
             select(func.count()).select_from(ScheduleItem))).scalar() or 0
         health = {
@@ -247,11 +268,18 @@ async def admin_analytics(
             "error_count": 0, "avg_resolution_hours": None,
         }
 
+        # Get all subscribers for the filter dropdown
+        from sqlalchemy import text as sql_text
+        all_subs = (await session.execute(
+            sql_text("SELECT id, company_name FROM subscribers ORDER BY company_name")
+        )).fetchall()
+
     html = _render("admin/analytics.html",
         request=request, days=days, usage=usage, usage_trends=trends,
         costs=costs, issues=issues, trade_breakdown=trade_breakdown,
         top_subs=top_subs, health=health, today=today, rates=DEFAULT_RATES,
         alerts=_check_alerts(_load_alerts(), usage, costs, health),
+        subscribers=all_subs, current_sub_id=subscriber_id, sub_name=sub_name,
     )
     return HTMLResponse(html)
 
