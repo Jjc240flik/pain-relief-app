@@ -11,6 +11,8 @@
       <p class="text-sm text-gray-500">Usage, costs, and performance analytics</p>
     </div>
     <div class="flex items-center gap-2">
+      <a href="/admin/subscribers" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Subscribers</a>
+      <span class="text-xs text-gray-300">|</span>
       <span class="text-xs text-gray-400">View:</span>
       <a href="/admin/analytics?days=7" class="px-2 py-1 text-xs rounded {% if days == 7 %}bg-blue-600 text-white{% else %}bg-gray-100 text-gray-600{% endif %}">7d</a>
       <a href="/admin/analytics?days=30" class="px-2 py-1 text-xs rounded {% if days == 30 %}bg-blue-600 text-white{% else %}bg-gray-100 text-gray-600{% endif %}">30d</a>

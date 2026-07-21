@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Subscribers — Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Subscribers</h1>
+      <p class="text-sm text-gray-500">Individual subscription companies</p>
+    </div>
+    <a href="/admin/subscribers/summary" class="text-sm text-blue-600 hover:text-blue-800 font-medium">View Summary →</a>
+  </div>
+
+  {% if not subscribers %}
+  <div class="text-center py-16 text-gray-400">
+    <p class="text-lg font-medium">No subscribers yet</p>
+    <p class="text-sm mt-1">New companies will appear here after onboarding.</p>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="text-left px-4 py-3 font-medium text-gray-600">Company</th>
+          <th class="text-left px-4 py-3 font-medium text-gray-600">Contact</th>
+          <th class="text-left px-4 py-3 font-medium text-gray-600">Phone</th>
+          <th class="text-left px-4 py-3 font-medium text-gray-600">Location</th>
+          <th class="text-center px-4 py-3 font-medium text-gray-600">Plan</th>
+          <th class="text-center px-4 py-3 font-medium text-gray-600">Status</th>
+          <th class="text-left px-4 py-3 font-medium text-gray-600">Since</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for s in subscribers %}
+        <tr class="hover:bg-gray-50 transition">
+          <td class="px-4 py-3 font-medium text-gray-900">{{ s.company_name }}</td>
+          <td class="px-4 py-3 text-gray-600">{{ s.contact_name or '—' }}<br><span class="text-xs text-gray-400">{{ s.contact_email or '' }}</span></td>
+          <td class="px-4 py-3 text-gray-600">{{ s.contact_phone or '—' }}</td>
+          <td class="px-4 py-3 text-gray-600">{{ s.city or '' }}{% if s.city and s.state %}, {% endif %}{{ s.state or '' }}</td>
+          <td class="px-4 py-3 text-center">
+            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium
+              {% if s.subscription_plan == 'paid' %}bg-green-100 text-green-700
+              {% else %}bg-gray-100 text-gray-500{% endif %}">
+              {{ s.subscription_plan }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-center">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
+              {% if s.is_active %}bg-green-50 text-green-600{% else %}bg-red-50 text-red-600{% endif %}">
+              <span class="w-1.5 h-1.5 rounded-full {% if s.is_active %}bg-green-500{% else %}bg-red-500{% endif %}"></span>
+              {{ 'Active' if s.is_active else 'Inactive' }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-gray-400 text-xs">{{ s.subscribed_at.strftime('%b %d, %Y') if s.subscribed_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-gray-400 mt-3">{{ subscribers|length }} subscriber(s) total</p>
+  {% endif %}
+
+  <div class="mt-6">
+    <a href="/admin/analytics" class="text-sm text-blue-600 hover:text-blue-800">← Back to Analytics</a>
+  </div>
+</div>
+{% endblock %}

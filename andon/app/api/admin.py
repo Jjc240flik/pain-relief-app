@@ -597,3 +597,42 @@ async def save_alerts(
     }
     _save_alerts(cfg)
     return HTMLResponse("", status_code=303, headers={"Location": "/admin/alerts?saved=1"})
+
+
+# ── Subscriber Management ──
+
+@router.get("/subscribers", response_class=HTMLResponse)
+async def admin_subscribers(
+    request: Request,
+    user: dict = Depends(require_owner),
+):
+    """List all subscriber companies."""
+    from sqlalchemy import text as sql_text
+    async with async_session() as session:
+        result = await session.execute(sql_text(
+            "SELECT id, company_name, contact_name, contact_email, contact_phone, "
+            "state, city, is_paid, subscription_plan, subscribed_at, is_active "
+            "FROM subscribers ORDER BY company_name"
+        ))
+        rows = result.fetchall()
+    html = _render("admin/subscribers.html", request=request, subscribers=rows, user=user)
+    return HTMLResponse(html)
+
+
+@router.get("/subscribers/summary", response_class=HTMLResponse)
+async def admin_subscribers_summary(
+    request: Request,
+    user: dict = Depends(require_owner),
+):
+    """Aggregated totals of all subscribers."""
+    from sqlalchemy import text as sql_text
+    async with async_session() as session:
+        total = (await session.execute(sql_text("SELECT count(*) FROM subscribers"))).scalar() or 0
+        paid = (await session.execute(sql_text("SELECT count(*) FROM subscribers WHERE is_paid = true"))).scalar() or 0
+        active = (await session.execute(sql_text("SELECT count(*) FROM subscribers WHERE is_active = true"))).scalar() or 0
+        by_state = (await session.execute(sql_text(
+            "SELECT state, count(*) FROM subscribers WHERE state != '' GROUP BY state ORDER BY count(*) DESC"
+        ))).fetchall()
+    html = _render("admin/subscribers_summary.html",
+        request=request, total=total, paid=paid, active=active, by_state=by_state, user=user)
+    return HTMLResponse(html)
