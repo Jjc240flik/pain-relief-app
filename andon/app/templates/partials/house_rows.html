@@ -81,11 +81,18 @@
                      bg-green-50 text-green-700 hover:bg-green-100">
         ✓ Resolve
       </button>
-      <button onclick="pushDay('{{ item.id }}')"
-              class="push-btn px-3 py-1.5 text-xs font-medium rounded-lg transition
-                     bg-blue-50 text-blue-700 hover:bg-blue-100">
-        +
-      </button>
+      <div class="flex items-center gap-1 push-group" data-item-id="{{ item.id }}">
+        <button onclick="pushInc('{{ item.id }}')"
+                class="push-inc px-3 py-1.5 text-xs font-medium rounded-lg transition
+                       bg-blue-50 text-blue-700 hover:bg-blue-100">
+          +
+        </button>
+        <button onclick="pushSend('{{ item.id }}')"
+                class="push-send px-2 py-1.5 text-[10px] font-medium rounded-lg transition
+                       bg-green-600 text-white hover:bg-green-700 hidden">
+          Send
+        </button>
+      </div>
       <button onclick="openDatePicker('{{ item.id }}', '{{ item.trade_display | e }}', '{{ item.following_trades | join(',') }}')"
               class="px-3 py-1.5 text-xs font-medium rounded-lg transition
                      bg-gray-50 text-gray-600 hover:bg-gray-100">

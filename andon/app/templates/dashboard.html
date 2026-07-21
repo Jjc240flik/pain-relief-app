@@ -323,15 +323,30 @@ function submitDatePush(event) {
     });
 }
 
-// ── + button cumulative push ──
+// ── + button incremental with confirm ──
 var _pushCounts = {};
 
-function pushDay(itemId) {
+function pushInc(itemId) {
   if (!_pushCounts[itemId]) _pushCounts[itemId] = 0;
   _pushCounts[itemId]++;
-  var btn = document.querySelector('#row-' + itemId + ' .push-btn');
-  if (btn) btn.textContent = '+' + _pushCounts[itemId];
-  fetch('/dashboard/' + itemId + '/push?days=1', { method: 'POST' });
+  var group = document.querySelector('.push-group[data-item-id="' + itemId + '"]');
+  if (group) {
+    group.querySelector('.push-inc').textContent = '+' + _pushCounts[itemId];
+    group.querySelector('.push-send').classList.remove('hidden');
+  }
+}
+
+function pushSend(itemId) {
+  var count = _pushCounts[itemId] || 1;
+  // Reset UI immediately
+  _pushCounts[itemId] = 0;
+  var group = document.querySelector('.push-group[data-item-id="' + itemId + '"]');
+  if (group) {
+    group.querySelector('.push-inc').textContent = '+';
+    group.querySelector('.push-send').classList.add('hidden');
+  }
+  // Send the push
+  fetch('/dashboard/' + itemId + '/push?days=' + count, { method: 'POST' });
 }
 
 // ── Existing dropdown & modal functions ──
