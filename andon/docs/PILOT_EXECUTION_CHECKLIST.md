@@ -183,6 +183,11 @@ After credentials are set: I will add signature validation, dedup, and verify en
 | Jul 21 | MMS media URLs extracted from Plivo payload | ✅ |
 | Jul 21 | Pilot Health dashboard deployed | ✅ |
 | Jul 21 | User activity tracking (login, dashboard, actions) | ✅ |
+| Jul 22 | Scheduling recovery: review step before confirm | ✅ |
+| Jul 22 | Scheduling recovery: 3 cascade options (Trade Only, +Next, Selected) | ✅ |
+| Jul 22 | Scheduling recovery: inline notifications retained | ✅ |
+| Jul 22 | Scheduling recovery: `schedule_change_groups` audit trail | ✅ |
+| Jul 22 | Scheduling recovery: confirmed-date conflict warnings structure | ✅ |
 
 ---
 
