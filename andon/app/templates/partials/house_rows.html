@@ -95,7 +95,7 @@
           Send
         </button>
       </div>
-      <button onclick="openDatePicker('{{ item.id }}', '{{ item.trade_display | e }}', '{{ item.following_trades | join(',') }}')"
+      <button onclick="openDatePicker('{{ item.id }}', '{{ item.trade_display | e }}', '{{ item.following_trades | join(',') }}', '{{ item.address | e }}')"
               class="px-3 py-1.5 text-xs font-medium rounded-lg transition
                      bg-gray-50 text-gray-600 hover:bg-gray-100">
         📅 Date

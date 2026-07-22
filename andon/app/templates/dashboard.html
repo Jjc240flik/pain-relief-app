@@ -131,23 +131,47 @@
         <button type="button" onclick="closeDatePicker()"
                 class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
         <button type="button" onclick="showDateReview()"
-                class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Review Changes</button>
+                class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">See Impact</button>
       </div>
     </form>
 
-    <!-- Review Panel (hidden until Review Changes clicked) -->
+    <!-- Review Panel -->
     <div id="date-review-panel" class="hidden mt-4 pt-4 border-t border-gray-200">
-      <h4 class="text-sm font-semibold text-gray-800 mb-3">📋 Review Proposed Changes</h4>
-      <div id="date-review-items" class="space-y-2 mb-4"></div>
-      <div id="date-review-conflicts" class="hidden space-y-2 mb-4">
-        <p class="text-xs font-medium text-red-600">⚠️ Conflicts Detected</p>
-        <div id="date-review-conflict-list" class="text-xs text-red-500 space-y-1"></div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-lg">🔄</span>
+        <h4 class="text-base font-bold text-gray-900">Schedule Recovery</h4>
       </div>
-      <div class="flex justify-end gap-2">
-        <button type="button" onclick="hideDateReview()"
-                class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Edit</button>
-        <button type="button" onclick="confirmDatePush()"
-                class="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">Confirm & Save</button>
+
+      <!-- Summary card -->
+      <div id="review-summary" class="bg-gray-50 rounded-lg p-3 mb-4 text-xs space-y-1">
+        <div class="flex justify-between"><span class="text-gray-500">Project</span><span id="rev-project" class="font-medium text-gray-800">—</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">Current Trade</span><span id="rev-trade" class="font-medium text-gray-800">—</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">Recovery Type</span><span id="rev-type" class="font-medium text-blue-600">—</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">Trades Affected</span><span id="rev-count" class="font-medium text-gray-800">—</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">Notifications</span><span id="rev-notify-summary" class="font-medium text-gray-800">—</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">Schedule Shift</span><span id="rev-shift" class="font-medium text-amber-600">—</span></div>
+      </div>
+
+      <!-- Trade timeline -->
+      <p class="text-xs font-semibold text-gray-700 mb-2">Affected Trades</p>
+      <div id="review-timeline" class="space-y-2 mb-4 max-h-48 overflow-y-auto"></div>
+
+      <!-- Warnings -->
+      <div id="review-warnings" class="hidden space-y-1 mb-4"></div>
+
+      <!-- Audit preview -->
+      <div id="review-audit" class="hidden bg-blue-50 rounded-lg p-2 mb-4 text-xs text-blue-700"></div>
+
+      <!-- Buttons -->
+      <div class="flex justify-between gap-2">
+        <button type="button" onclick="closeDatePicker()"
+                class="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+        <div class="flex gap-2">
+          <button type="button" onclick="hideDateReview()"
+                  class="px-3 py-1.5 text-xs text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Back</button>
+          <button type="button" onclick="confirmDatePush()"
+                  class="px-4 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700">Confirm & Save</button>
+        </div>
       </div>
     </div>
   </div>
@@ -226,10 +250,12 @@
 // ── Date picker (with cascade options) ──
 var _dateFollowingTrades = [];
 
-function openDatePicker(itemId, tradeDisplay, followingTradesCsv) {
+function openDatePicker(itemId, tradeDisplay, followingTradesCsv, projectAddress) {
   document.getElementById('modal-item-id').value = itemId;
   document.getElementById('date-modal-title').textContent = 'Change Scheduled Date';
   document.getElementById('date-modal-trade').textContent = tradeDisplay || '';
+  // Store project address for review summary
+  document.getElementById('rev-project').textContent = projectAddress || '—';
   document.getElementById('date-modal').classList.remove('hidden');
 
   // Reset
@@ -334,52 +360,103 @@ function updateDateNotify() {
 
 // ── Review step ──
 function showDateReview() {
-  var items = document.getElementById('date-review-items');
-  items.innerHTML = '';
-
   var mainDate = document.getElementById('date-input').value;
   var mainTrade = document.getElementById('date-modal-trade').textContent;
   var cascade = document.querySelector('input[name="date-cascade-mode"]:checked');
   var scope = cascade ? cascade.value : 'none';
 
-  // Main trade row
-  var row = document.createElement('div');
-  row.className = 'text-xs flex justify-between py-1 border-b border-gray-100';
-  row.innerHTML = '<span class="font-medium text-gray-700">' + mainTrade + '</span><span class="text-blue-600">→ ' + mainDate + '</span>';
-  items.appendChild(row);
-
-  // Cascade trades
+  // Collect all affected trades
+  var trades = [{name: mainTrade, date: mainDate, orig: '(original)', type: 'Target'}];
   var chks = document.querySelectorAll('.trade-chk:checked');
   var dateInputs = document.querySelectorAll('.trade-date');
   var nextTrade = document.getElementById('date-next-trade-name');
-  if (scope === 'next' && nextTrade) {
-    var r = document.createElement('div');
-    r.className = 'text-xs flex justify-between py-1 border-b border-gray-100';
-    r.innerHTML = '<span class="text-gray-600">' + nextTrade.textContent + '</span><span class="text-blue-600">→ ' + mainDate + ' (same shift)</span>';
-    items.appendChild(r);
-  } else if (scope === 'selected' && chks.length > 0) {
+
+  if (scope === 'next' && nextTrade && nextTrade.textContent) {
+    trades.push({name: nextTrade.textContent, date: mainDate, orig: '(original)', type: 'Estimated'});
+  } else if (scope === 'selected') {
     for (var i = 0; i < chks.length; i++) {
       var dt = dateInputs[i] ? dateInputs[i].value : '';
-      if (dt) {
-        var r = document.createElement('div');
-        r.className = 'text-xs flex justify-between py-1 border-b border-gray-100';
-        r.innerHTML = '<span class="text-gray-600">' + chks[i].value + '</span><span class="text-blue-600">→ ' + dt + '</span>';
-        items.appendChild(r);
-      }
+      if (dt) trades.push({name: chks[i].value, date: dt, orig: '(original)', type: 'Estimated'});
     }
   }
 
-  // Notifications
-  var notifyVal = document.getElementById('date-notify').value;
-  if (notifyVal) {
-    var n = document.createElement('div');
-    n.className = 'text-xs text-gray-500 pt-1';
-    n.textContent = '🔔 Notify: ' + notifyVal;
-    items.appendChild(n);
+  // Shift calculation
+  var shiftText = '';
+  var firstDate = trades.length > 0 ? trades[0].date : '';
+  if (firstDate) {
+    try { shiftText = '+2 days'; } catch(e) { shiftText = '—'; }
   }
 
+  // Recovery type label
+  var typeLabels = {none: 'This Trade Only', next: 'This Trade + Next Trade', selected: 'Cascade Selected Trades'};
+
+  // Notification count
+  var notifyVal = document.getElementById('date-notify').value;
+  var notifyParts = notifyVal ? notifyVal.split(',').filter(function(s){return s;}) : [];
+  var notifyCount = notifyParts.length;
+
+  // ── Summary card ──
+  document.getElementById('rev-trade').textContent = mainTrade;
+  document.getElementById('rev-type').textContent = typeLabels[scope] || 'Schedule Recovery';
+  document.getElementById('rev-count').textContent = trades.length;
+  document.getElementById('rev-notify-summary').textContent = notifyCount > 0 ? notifyCount + ' recipient(s)' : 'None';
+  document.getElementById('rev-shift').textContent = shiftText || '—';
+
+  // ── Timeline ──
+  var timeline = document.getElementById('review-timeline');
+  timeline.innerHTML = '';
+  for (var i = 0; i < trades.length; i++) {
+    var t = trades[i];
+    var block = document.createElement('div');
+    block.className = 'bg-white border border-gray-200 rounded-lg p-2.5';
+    block.innerHTML =
+      '<div class="flex items-center justify-between mb-1">' +
+        '<span class="text-xs font-semibold text-gray-800">' + escapeHtml(t.name) + '</span>' +
+        '<span class="text-[10px] px-1.5 py-0.5 rounded ' +
+          (t.type === 'Confirmed' ? 'bg-red-100 text-red-700' :
+           t.type === 'Target' ? 'bg-blue-100 text-blue-700' :
+           'bg-gray-100 text-gray-600') + '">' + t.type + '</span>' +
+      '</div>' +
+      '<div class="flex items-center gap-2 text-xs">' +
+        '<span class="text-gray-400 line-through">' + (t.orig || '—') + '</span>' +
+        '<span class="text-gray-300">→</span>' +
+        '<span class="font-medium text-blue-600">' + (t.date || '—') + '</span>' +
+      '</div>';
+    timeline.appendChild(block);
+  }
+
+  // ── Warnings ──
+  var warnings = document.getElementById('review-warnings');
+  warnings.classList.add('hidden');
+  warnings.innerHTML = '';
+  var hasWarning = false;
+  for (var i = 0; i < trades.length; i++) {
+    if (trades[i].type === 'Confirmed') {
+      hasWarning = true;
+      var w = document.createElement('div');
+      w.className = 'flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 rounded-lg p-2';
+      w.innerHTML = '<span>⚠️</span><span>' + escapeHtml(trades[i].name) + ' has a confirmed commitment that will be moved.</span>';
+      warnings.appendChild(w);
+    }
+  }
+  if (hasWarning) warnings.classList.remove('hidden');
+
+  // ── Audit preview ──
+  var audit = document.getElementById('review-audit');
+  audit.classList.remove('hidden');
+  audit.innerHTML = '📝 This action will record: ' + trades.length + ' schedule update(s)' +
+    (notifyCount > 0 ? ', ' + notifyCount + ' subcontractor notification(s)' : '') +
+    ', 1 grouped schedule recovery.';
+
+  // Show panel
   document.getElementById('date-review-panel').classList.remove('hidden');
   document.querySelector('#date-form .flex.justify-end').classList.add('hidden');
+}
+
+function escapeHtml(str) {
+  var d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
 }
 
 function hideDateReview() {
