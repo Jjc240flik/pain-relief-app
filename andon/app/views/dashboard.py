@@ -740,6 +740,27 @@ async def push_custom_item(
                         t_name, t_date = pair.split(":", 1)
                         await _set_trade_date(t_name.strip(), t_date.strip())
 
+        # ── Record schedule change group ──
+        try:
+            from sqlalchemy import text as sql_text
+            change_scope = cascade if cascade != "none" else "this_trade_only"
+            house_id_str = str(item.house_id) if item.house_id else None
+            u = request.state.user if hasattr(request, 'state') and hasattr(request.state, 'user') else None
+            username = u.get("username", "unknown") if u else "unknown"
+            gid = await session.execute(sql_text(
+                "INSERT INTO schedule_change_groups (project_id, change_scope, created_by) "
+                "VALUES (:pid, :scope, :by) RETURNING id"
+            ), {"pid": house_id_str, "scope": change_scope, "by": username})
+            group_id = gid.fetchone()[0]
+            await session.execute(sql_text(
+                "INSERT INTO schedule_change_items (group_id, trade, house_id, original_date, proposed_date, date_type) "
+                "VALUES (:gid, :trade, :hid, :orig, :prop, 'target')"
+            ), {"gid": group_id, "trade": item.trade, "hid": house_id_str,
+                "orig": item.scheduled_start, "prop": parsed})
+            logger.info("Schedule change group %s recorded for %s", group_id, item.trade)
+        except Exception as exc:
+            logger.warning("Failed to record schedule change group: %s", exc)
+
         # ── Send notifications to selected roles ──
         if notify:
             from app.services.outbound import OutboundService

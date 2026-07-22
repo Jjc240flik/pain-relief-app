@@ -130,10 +130,26 @@
       <div class="flex justify-end gap-2 mt-4">
         <button type="button" onclick="closeDatePicker()"
                 class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-        <button type="submit"
-                class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Update</button>
+        <button type="button" onclick="showDateReview()"
+                class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Review Changes</button>
       </div>
     </form>
+
+    <!-- Review Panel (hidden until Review Changes clicked) -->
+    <div id="date-review-panel" class="hidden mt-4 pt-4 border-t border-gray-200">
+      <h4 class="text-sm font-semibold text-gray-800 mb-3">📋 Review Proposed Changes</h4>
+      <div id="date-review-items" class="space-y-2 mb-4"></div>
+      <div id="date-review-conflicts" class="hidden space-y-2 mb-4">
+        <p class="text-xs font-medium text-red-600">⚠️ Conflicts Detected</p>
+        <div id="date-review-conflict-list" class="text-xs text-red-500 space-y-1"></div>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="hideDateReview()"
+                class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Edit</button>
+        <button type="button" onclick="confirmDatePush()"
+                class="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">Confirm & Save</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -316,15 +332,68 @@ function updateDateNotify() {
   document.getElementById('date-notify').value = selected.join(',');
 }
 
-function submitDatePush(event) {
-  event.preventDefault();
+// ── Review step ──
+function showDateReview() {
+  var items = document.getElementById('date-review-items');
+  items.innerHTML = '';
+
+  var mainDate = document.getElementById('date-input').value;
+  var mainTrade = document.getElementById('date-modal-trade').textContent;
+  var cascade = document.querySelector('input[name="date-cascade-mode"]:checked');
+  var scope = cascade ? cascade.value : 'none';
+
+  // Main trade row
+  var row = document.createElement('div');
+  row.className = 'text-xs flex justify-between py-1 border-b border-gray-100';
+  row.innerHTML = '<span class="font-medium text-gray-700">' + mainTrade + '</span><span class="text-blue-600">→ ' + mainDate + '</span>';
+  items.appendChild(row);
+
+  // Cascade trades
+  var chks = document.querySelectorAll('.trade-chk:checked');
+  var dateInputs = document.querySelectorAll('.trade-date');
+  var nextTrade = document.getElementById('date-next-trade-name');
+  if (scope === 'next' && nextTrade) {
+    var r = document.createElement('div');
+    r.className = 'text-xs flex justify-between py-1 border-b border-gray-100';
+    r.innerHTML = '<span class="text-gray-600">' + nextTrade.textContent + '</span><span class="text-blue-600">→ ' + mainDate + ' (same shift)</span>';
+    items.appendChild(r);
+  } else if (scope === 'selected' && chks.length > 0) {
+    for (var i = 0; i < chks.length; i++) {
+      var dt = dateInputs[i] ? dateInputs[i].value : '';
+      if (dt) {
+        var r = document.createElement('div');
+        r.className = 'text-xs flex justify-between py-1 border-b border-gray-100';
+        r.innerHTML = '<span class="text-gray-600">' + chks[i].value + '</span><span class="text-blue-600">→ ' + dt + '</span>';
+        items.appendChild(r);
+      }
+    }
+  }
+
+  // Notifications
+  var notifyVal = document.getElementById('date-notify').value;
+  if (notifyVal) {
+    var n = document.createElement('div');
+    n.className = 'text-xs text-gray-500 pt-1';
+    n.textContent = '🔔 Notify: ' + notifyVal;
+    items.appendChild(n);
+  }
+
+  document.getElementById('date-review-panel').classList.remove('hidden');
+  document.querySelector('#date-form .flex.justify-end').classList.add('hidden');
+}
+
+function hideDateReview() {
+  document.getElementById('date-review-panel').classList.add('hidden');
+  document.querySelector('#date-form .flex.justify-end').classList.remove('hidden');
+}
+
+function confirmDatePush() {
   updateDateTradeRows();
   updateDateNotify();
-  var form = document.getElementById('date-form');
-  var formData = new FormData(form);
-  var itemId = formData.get('item_id');
+  var itemId = document.getElementById('modal-item-id').value;
+  var fd = new FormData(document.getElementById('date-form'));
   closeDatePicker();
-  fetch('/dashboard/' + itemId + '/push-custom', { method: 'POST', body: formData })
+  fetch('/dashboard/' + itemId + '/push-custom', { method: 'POST', body: fd })
     .then(function() {
       htmx.ajax('GET','/dashboard/partial',{target:'#house-list',swap:'innerHTML'});
     });
