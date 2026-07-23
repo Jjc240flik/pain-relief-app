@@ -20,18 +20,18 @@ One Builder. One PM. Twenty Houses. Real SMS. Real MMS. Real Voice. Real schedul
 
 | Item | Status | Verified |
 |---|---|---|
-| ☐ Configure Twilio webhook URL in console | ⬜ | ⬜ |
-| ☐ Verify webhook receives POST from Twilio | ⬜ | ⬜ |
-| ☐ Receive SMS → store raw message | ⬜ | ⬜ |
-| ☐ Run keyword classifier on message | ⬜ | ⬜ |
-| ☐ Create Issue Card (Yellow or Red) | ⬜ | ⬜ |
-| ☐ Card appears on dashboard | ⬜ | ⬜ |
-| ☐ Resolve card → card disappears | ⬜ | ⬜ |
-| ☐ Verify audit log has the event | ⬜ | ⬜ |
+| ☐ Configure Twilio webhook URL in console | ✅ Done via API | ✅ |
+| ☐ Verify webhook receives POST from Twilio | ✅ 3 messages received | ✅ |
+| ☐ Receive SMS → store raw message | ✅ | ✅ |
+| ☐ Run keyword classifier on message | ✅ "Drywall damage" → Yellow | ✅ |
+| ☐ Create Issue Card (Yellow or Red) | ✅ Card created in schedule_items | ✅ |
+| ☐ Card appears on dashboard | ✅ | ✅ |
+| ☐ Resolve card → card disappears | ✅ | ✅ |
+| ☐ Verify audit log has the event | ✅ | ✅ |
 
-**Definition of Done:** SMS → Card → Resolve works end-to-end.
+**Definition of Done:** SMS → Card → Resolve works end-to-end. ✅
 
-**Actual completion:**
+**Actual completion:** July 23, 2026 — 16:55 UTC
 
 ---
 
