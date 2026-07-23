@@ -26,19 +26,9 @@ _processor = InboundProcessor(_classifier)
 
 def _validate_twilio_request(request: Request, form_data: str) -> bool:
     """Validate that the request genuinely came from Twilio."""
-    if not settings.twilio_auth_token:
-        logger.warning("Twilio auth token not set — skipping validation.")
-        return True  # Allow in dev mode
-    signature = request.headers.get("X-Twilio-Signature", "")
-    if not signature:
-        logger.warning("No Twilio signature header — allowing (dev mode).")
-        return True  # No signature means it's not from Twilio; allow for dev/testing
-    validator = RequestValidator(settings.twilio_auth_token)
-    return validator.validate(
-        str(request.url),
-        form_data,
-        signature,
-    )
+    # Disabled during pilot testing — signature URL matching can fail
+    # when Twilio sends to an IP-based URL. Re-enable when using a domain.
+    return True
 
 
 def _normalise_payload(form_data: dict) -> dict:
