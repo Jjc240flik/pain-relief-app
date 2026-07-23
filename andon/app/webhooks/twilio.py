@@ -159,7 +159,7 @@ async def inbound_voice(request: Request) -> Response:
     twiml = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         "<Response>"
-        "<Say voice='alice'>State your trade and issue after the beep.</Say>"
+        "<Say voice='alice'>State your trade, project address or number, and your issue after the beep.</Say>"
         "<Record maxLength='60' "
         f" action='{settings.get_base_url()}/webhooks/twilio/recording' "
         "method='POST' />"
