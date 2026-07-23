@@ -44,7 +44,7 @@ These principles override feature development during the pilot.
 | ☐ Verify duplicate protection | ⬜ | Add MessageUUID dedup |
 | ☐ Verify SMS end-to-end | ⬜ | Requires all above |
 
-**Current Blocker:** Missing Plivo credentials + OpenAI API key. See `docs/plivo_audit.md` for details.
+**Current Blocker:** Missing OpenAI API key (voice transcription) + Twilio webhook URLs not set in console.
 
 ---
 

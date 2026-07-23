@@ -35,8 +35,15 @@ class OutboundService:
         self._plivo = None
         self._provider = "log"
 
-        # Prefer Plivo
-        if settings.plivo_auth_id and settings.plivo_auth_token:
+        # Prefer Twilio (active pilot provider), then Plivo (future)
+        if settings.twilio_account_sid and settings.twilio_auth_token:
+            self._twilio = TwilioClient(
+                settings.twilio_account_sid,
+                settings.twilio_auth_token,
+            )
+            self._provider = "twilio"
+            logger.info("Outbound SMS provider: Twilio")
+        elif settings.plivo_auth_id and settings.plivo_auth_token:
             import plivo
             self._plivo = plivo.RestClient(
                 auth_id=settings.plivo_auth_id,
@@ -44,13 +51,6 @@ class OutboundService:
             )
             self._provider = "plivo"
             logger.info("Outbound SMS provider: Plivo")
-        elif settings.twilio_account_sid and settings.twilio_auth_token:
-            self._twilio = TwilioClient(
-                settings.twilio_account_sid,
-                settings.twilio_auth_token,
-            )
-            self._provider = "twilio"
-            logger.info("Outbound SMS provider: Twilio")
         else:
             logger.warning("No SMS provider configured — SMS sending disabled.")
 
