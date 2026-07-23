@@ -33,6 +33,7 @@ class InboundProcessor:
 
     def __init__(self, classifier: ClassifierEngine) -> None:
         self._classifier = classifier
+        self._pending_resolution = None
 
     async def process(
         self,
@@ -136,6 +137,7 @@ class InboundProcessor:
             session, channel, sender_id, full_text, audio_url,
             house_id, schedule_id, trade,
             raw_payload, cls_result, contact.name if contact else "unknown",
+            resolution=self._pending_resolution,
         )
         result["event_id"] = str(event.id) if event else None
 
@@ -157,45 +159,44 @@ class InboundProcessor:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    @staticmethod
     async def _resolve_context(
+        self,
         session: AsyncSession,
         sender_id: str,
         text: str,
         contact_trade: str | None,
-    ):
-        """
-        Determine which house and schedule_item this message relates to.
+    ) -> tuple:
+        """Determine the project and schedule_item for this message.
 
-        Strategy for MVP:
-          1. Try to extract an address (or part of it) from the message text.
-          2. Fall back to the sender's most recent active schedule item
-             matching their trade.
+        Uses Project Resolution Service to resolve via project_code,
+        address, alias, or sender assignment. Falls through to the
+        existing house+sched matching for the old pipeline.
         """
         from app.models.house import House
+        from app.services.project_resolver import resolve_project
 
+        # Use project resolution
+        resolution = await resolve_project(session, text, sender_id)
+        self._pending_resolution = resolution
+
+        # Existing house+sched matching (old pipeline)
         schedule_repo = ScheduleRepository(session)
         house_repo = HouseRepository(session)
         houses = await house_repo.list(limit=50)
 
-        # Try: check if any house address appears in the message text
         text_lower = text.lower()
         for h in houses:
             if h.address.lower() in text_lower:
-                # Found the house — now find the best matching schedule
                 scheds = await schedule_repo.get_by_house(h.id)
-                # Prefer a schedule matching the contact's trade
                 if contact_trade:
                     for s in scheds:
                         if s.trade == contact_trade and s.status in ("scheduled", "in_progress"):
                             return h, s
-                # Fall back to the first in_progress or scheduled item
                 for s in scheds:
                     if s.status in ("scheduled", "in_progress"):
                         return h, s
                 return h, None
 
-        # Fallback: find the most recent active schedule for the contact's trade
         if contact_trade:
             for h in houses:
                 scheds = await schedule_repo.get_by_house(h.id)
@@ -205,37 +206,43 @@ class InboundProcessor:
 
         return None, None
 
-    @staticmethod
     async def _log_event(
-        session: AsyncSession,
-        channel: str,
-        sender_id: str,
-        full_text: str,
-        audio_url: str | None,
-        house_id: UUID | None,
-        schedule_item_id: UUID | None,
-        trade: str | None,
-        raw_payload: dict | None,
-        cls_result: "ClassificationResult | None" = None,
-        sender_name: str = "unknown",
-    ) -> Event:
-        repo = BaseRepository(session, Event)
-        event = await repo.create(
-            direction="inbound",
-            channel=channel,
-            full_text=full_text,
-            original_media_url=audio_url,
-            house_id=house_id,
-            schedule_item_id=schedule_item_id,
-            trade=trade,
-            outcome=cls_result.andon_status if cls_result else None,
-            triggered_by="sub",
-            confidence_score=cls_result.confidence if cls_result else None,
-            sender_phone=sender_id if channel in ("sms", "phone_call") else None,
-            sender_email=sender_id if channel == "email" else None,
-            raw_payload=raw_payload,
-        )
-        return event
+            self,
+            session: AsyncSession,
+            channel: str,
+            sender_id: str,
+            full_text: str,
+            audio_url: str | None,
+            house_id: UUID | None,
+            schedule_item_id: UUID | None,
+            trade: str | None,
+            raw_payload: dict | None,
+            cls_result: "ClassificationResult | None" = None,
+            sender_name: str = "unknown",
+            resolution=None,
+        ) -> Event:
+            repo = BaseRepository(session, Event)
+            event = await repo.create(
+                direction="inbound",
+                channel=channel,
+                full_text=full_text,
+                original_media_url=audio_url,
+                house_id=house_id,
+                schedule_item_id=schedule_item_id,
+                trade=trade,
+                outcome=cls_result.andon_status if cls_result else None,
+                triggered_by="sub",
+                confidence_score=cls_result.confidence if cls_result else None,
+                sender_phone=sender_id if channel in ("sms", "phone_call") else None,
+                sender_email=sender_id if channel == "email" else None,
+                raw_payload=raw_payload,
+                resolved_project_id=resolution.project_id if resolution else None,
+                project_resolution_method=resolution.method if resolution else None,
+                project_resolution_confidence=resolution.confidence if resolution else None,
+                candidate_project_ids=[c["id"] for c in (resolution.candidates or [])] if resolution else None,
+                clarification_status="pending" if (resolution and resolution.clarification_required) else "not_required",
+            )
+            return event
 
     @staticmethod
     async def _handle_selections(
